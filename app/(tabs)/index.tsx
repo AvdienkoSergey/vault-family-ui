@@ -1,98 +1,335 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useState, useMemo } from "react"
+import {
+  View,
+  Text,
+  TextInput,
+  ScrollView,
+  Pressable,
+  StyleSheet,
+} from "react-native"
+import { Ionicons } from "@expo/vector-icons"
+import { useVault } from "@/lib/vault-context"
+import { personalEntries, sharedEntries } from "@/lib/data"
+import type { VaultEntry } from "@/lib/types"
+import { useTheme } from "@/lib/theme-context"
+import { withOpacity, radius, type ColorPalette } from "@/lib/theme"
+import { VaultEntryCard } from "@/components/vault-entry-card"
+import { EntryDetail } from "@/components/entry-detail"
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+type VaultTab = "all" | "personal" | "shared"
 
-export default function HomeScreen() {
+export default function VaultScreen() {
+  const { colors } = useTheme()
+  const styles = useMemo(() => createStyles(colors), [colors])
+  const { sessionState } = useVault()
+  const [search, setSearch] = useState("")
+  const [vaultTab, setVaultTab] = useState<VaultTab>("all")
+  const [selectedEntry, setSelectedEntry] = useState<VaultEntry | null>(null)
+
+  if (selectedEntry) {
+    return (
+      <EntryDetail
+        entry={selectedEntry}
+        onBack={() => setSelectedEntry(null)}
+      />
+    )
+  }
+
+  if (sessionState === "locked") {
+    return <LockedOverlay />
+  }
+
+  const allEntries = [...personalEntries, ...sharedEntries]
+  const sourceEntries =
+    vaultTab === "all"
+      ? allEntries
+      : vaultTab === "personal"
+        ? personalEntries
+        : sharedEntries
+
+  const filteredEntries = sourceEntries.filter(
+    (entry) =>
+      entry.title.toLowerCase().includes(search.toLowerCase()) ||
+      entry.login.toLowerCase().includes(search.toLowerCase()) ||
+      entry.category.toLowerCase().includes(search.toLowerCase())
+  )
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.headerTitle}>My Vault</Text>
+            <Text style={styles.headerSub}>
+              {allEntries.length} entries across {personalEntries.length}{" "}
+              personal, {sharedEntries.length} shared
+            </Text>
+          </View>
+          <Pressable
+            style={styles.addBtn}
+            onPress={() => {
+              throw new Error("NOT_IMPLEMENTED: navigate to Add Entry screen (encrypt via WasmBridge before saving)")
+            }}
+          >
+            <Ionicons name="add" size={14} color={colors.primaryForeground} />
+            <Text style={styles.addBtnText}>Add</Text>
+          </Pressable>
+        </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
-  );
+        {/* Search */}
+        <View style={styles.searchRow}>
+          <View style={styles.searchContainer}>
+            <Ionicons
+              name="search"
+              size={16}
+              color={colors.mutedForeground}
+            />
+            <TextInput
+              placeholder="Search vault entries..."
+              placeholderTextColor={colors.mutedForeground}
+              value={search}
+              onChangeText={setSearch}
+              style={styles.searchInput}
+            />
+          </View>
+          <Pressable
+            style={styles.filterBtn}
+            onPress={() => {
+              throw new Error("NOT_IMPLEMENTED: open filter/sort options (by category, date, favorites)")
+            }}
+          >
+            <Ionicons
+              name="options"
+              size={16}
+              color={colors.mutedForeground}
+            />
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Tabs */}
+      <View style={styles.tabs}>
+        <View style={styles.tabList}>
+          {(["all", "personal", "shared"] as VaultTab[]).map((tab) => (
+            <Pressable
+              key={tab}
+              onPress={() => setVaultTab(tab)}
+              style={[styles.tab, vaultTab === tab && styles.tabActive]}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  vaultTab === tab && styles.tabTextActive,
+                ]}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {/* Entry list */}
+      <ScrollView
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+      >
+        {filteredEntries.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons
+              name="search"
+              size={32}
+              color={withOpacity(colors.mutedForeground, 0.4)}
+            />
+            <Text style={styles.emptyTitle}>No entries found</Text>
+            <Text style={styles.emptySub}>Try a different search term</Text>
+          </View>
+        ) : (
+          filteredEntries.map((entry) => (
+            <VaultEntryCard
+              key={entry.id}
+              entry={entry}
+              onSelect={setSelectedEntry}
+            />
+          ))
+        )}
+      </ScrollView>
+    </View>
+  )
 }
 
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+function LockedOverlay() {
+  const { colors } = useTheme()
+  const styles = useMemo(() => createStyles(colors), [colors])
+
+  return (
+    <View style={styles.locked}>
+      <View style={styles.lockedIcon}>
+        <Ionicons name="lock-closed" size={40} color={colors.primary} />
+      </View>
+      <Text style={styles.lockedTitle}>Vault Locked</Text>
+      <Text style={styles.lockedSub}>
+        Your session has ended. Tap the lock icon to unlock with your VaultPass.
+      </Text>
+      <Text style={styles.lockedHint}>All decrypted data has been zeroized</Text>
+    </View>
+  )
+}
+
+const createStyles = (colors: ColorPalette) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  headerTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.foreground,
+  },
+  headerSub: {
+    fontSize: 12,
+    color: colors.mutedForeground,
+    marginTop: 2,
+  },
+  addBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    height: 32,
+    paddingHorizontal: 12,
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+  },
+  addBtnText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: colors.primaryForeground,
+  },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
-  stepContainer: {
+  searchContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
+    height: 36,
+    paddingHorizontal: 12,
+    backgroundColor: colors.secondary,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.foreground,
+    padding: 0,
+  },
+  filterBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabs: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  tabList: {
+    flexDirection: "row",
+    backgroundColor: colors.secondary,
+    borderRadius: radius.sm,
+    padding: 2,
+  },
+  tab: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 6,
+    borderRadius: radius.sm - 2,
+  },
+  tabActive: {
+    backgroundColor: colors.card,
+  },
+  tabText: {
+    fontSize: 12,
+    color: colors.mutedForeground,
+    fontWeight: "500",
+  },
+  tabTextActive: {
+    color: colors.foreground,
+  },
+  list: {
+    flex: 1,
+  },
+  listContent: {
+    padding: 16,
+    gap: 8,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 48,
+  },
+  emptyTitle: {
+    fontSize: 14,
+    color: colors.mutedForeground,
+    marginTop: 12,
+  },
+  emptySub: {
+    fontSize: 12,
+    color: withOpacity(colors.mutedForeground, 0.6),
+    marginTop: 4,
+  },
+  locked: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    backgroundColor: colors.background,
+  },
+  lockedIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 16,
+    backgroundColor: withOpacity(colors.primary, 0.1),
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 24,
+  },
+  lockedTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: colors.foreground,
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  lockedSub: {
+    fontSize: 14,
+    color: colors.mutedForeground,
+    textAlign: "center",
+    maxWidth: 280,
   },
-});
+  lockedHint: {
+    fontSize: 12,
+    color: withOpacity(colors.mutedForeground, 0.6),
+    fontFamily: "monospace",
+    marginTop: 16,
+  },
+})
