@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.1.0...v1.1.1) (2026-03-05)
+
+
+### Bug Fixes
+
+* **ci:** use gradlew assembleRelease instead of expo run:android ([8de0e91](https://github.com/AvdienkoSergey/vault-family-ui/commit/8de0e91e7a9f7ad2b2a11c1ba25f98fec26ac704))
+
 ## [1.1.0](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.0.0...v1.1.0) (2026-03-05)
 
 
