@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import {
   View,
   Text,
@@ -29,6 +29,7 @@ export default function UnlockScreen() {
   const [knownUsers, setKnownUsers] = useState<string[]>([])
   const [hasBiometrics, setHasBiometrics] = useState(false)
   const [email, setEmail] = useState("")
+  const lastSigninEmail = useRef("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -41,6 +42,7 @@ export default function UnlockScreen() {
         setHasBiometrics(bioAvailable)
         if (users.length > 0) {
           setEmail(users[0])
+          lastSigninEmail.current = users[0]
           preloadForEmail(users[0])
           setMode("signin")
         } else {
@@ -111,7 +113,7 @@ export default function UnlockScreen() {
                       styles.userChip,
                       u === email && styles.userChipActive,
                     ]}
-                    onPress={() => { setEmail(u); preloadForEmail(u); setError("") }}
+                    onPress={() => { setEmail(u); lastSigninEmail.current = u; preloadForEmail(u); setError("") }}
                   >
                     <Text
                       style={[
@@ -218,7 +220,13 @@ export default function UnlockScreen() {
             style={styles.footerBtn}
             onPress={() => {
               setMode(isCreate ? "signin" : "create")
-              setEmail(isCreate && knownUsers.length > 0 ? knownUsers[0] : "")
+              if (isCreate && knownUsers.length > 0) {
+                const restore = lastSigninEmail.current || knownUsers[0]
+                setEmail(restore)
+                preloadForEmail(restore)
+              } else {
+                setEmail("")
+              }
               setPassword("")
               setConfirmPassword("")
               setError("")
