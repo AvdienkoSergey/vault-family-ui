@@ -7,7 +7,7 @@ import { withOpacity, radius, type ColorPalette } from "@/lib/theme"
 
 export default function SettingsScreen() {
   const { currentUser } = useVault()
-  const { colors } = useTheme()
+  const { colors, colorScheme, toggleTheme } = useTheme()
   const styles = useMemo(() => createStyles(colors), [colors])
   const [biometricEnabled, setBiometricEnabled] = useState(true)
   const [zeroizeEnabled, setZeroizeEnabled] = useState(true)
@@ -85,6 +85,22 @@ export default function SettingsScreen() {
           onToggle={(v) => {
             setZeroizeEnabled(v)
           }}
+        />
+        <View style={styles.divider} />
+        <SettingRow
+          colors={colors}
+          styles={styles}
+          icon={
+            <Ionicons
+              name={colorScheme === "dark" ? "moon" : "sunny"}
+              size={16}
+              color={colors.mutedForeground}
+            />
+          }
+          label="Dark Theme"
+          toggle
+          checked={colorScheme === "dark"}
+          onToggle={toggleTheme}
         />
         <View style={styles.divider} />
         <SettingRow
