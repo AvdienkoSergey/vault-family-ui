@@ -1,10 +1,10 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react"
-import type { SessionState, UserProfile } from "./types"
+import type { SessionState, UserProfile, Email, Password } from "./types"
 
 interface VaultContextType {
   currentUser: UserProfile | null
   sessionState: SessionState
-  unlock: (name: string, password: string) => void
+  unlock: (email: Email, password: Password) => void
   lock: () => void
 }
 
@@ -14,8 +14,9 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   const [sessionState, setSessionState] = useState<SessionState>("locked")
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null)
 
-  const unlock = useCallback((name: string, _password: string) => {
+  const unlock = useCallback((email: Email, _password: Password) => {
     // TODO: validate password via WasmBridge / derive keys
+    const name = email.split("@")[0]
     setCurrentUser({
       id: "u1",
       name,

@@ -12,35 +12,46 @@ import { Ionicons } from "@expo/vector-icons"
 import { useVault } from "@/lib/vault-context"
 import { useTheme } from "@/lib/theme-context"
 import { withOpacity, radius, type ColorPalette } from "@/lib/theme"
+import { parseEmail, parsePassword } from "@/lib/types"
 
 export default function UnlockScreen() {
   const { unlock } = useVault()
   const { colors } = useTheme()
   const styles = useMemo(() => createStyles(colors), [colors])
 
-  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isFirstRun] = useState(true) // TODO: detect from storage
   const [error, setError] = useState("")
 
-  const canSubmit = isFirstRun
-    ? name.trim().length > 0 && password.length >= 6 && password === confirmPassword
-    : password.length >= 1
-
   const handleSubmit = () => {
     setError("")
+
+    const emailResult = parseEmail(email)
+    if (!emailResult.ok) {
+      setError(emailResult.error)
+      return
+    }
+
+    const passwordResult = parsePassword(password)
+    if (!passwordResult.ok) {
+      setError(passwordResult.error)
+      return
+    }
+
     if (isFirstRun && password !== confirmPassword) {
       setError("Passwords do not match")
       return
     }
-    if (isFirstRun && password.length < 6) {
-      setError("Password must be at least 6 characters")
-      return
-    }
-    unlock(name.trim() || "User", password)
+
+    unlock(emailResult.value, passwordResult.value)
   }
+
+  const canSubmit = isFirstRun
+    ? email.includes("@") && password.length >= 8 && confirmPassword.length > 0
+    : password.length >= 1
 
   return (
     <KeyboardAvoidingView
@@ -63,15 +74,17 @@ export default function UnlockScreen() {
         <View style={styles.card}>
           {isFirstRun && (
             <View style={styles.field}>
-              <Text style={styles.label}>Your Name</Text>
+              <Text style={styles.label}>Email</Text>
               <TextInput
                 style={styles.input}
-                value={name}
-                onChangeText={setName}
-                placeholder="Enter your name"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Enter your email"
                 placeholderTextColor={colors.mutedForeground}
-                autoCapitalize="words"
+                autoCapitalize="none"
                 autoCorrect={false}
+                keyboardType="email-address"
+                textContentType="emailAddress"
               />
             </View>
           )}
