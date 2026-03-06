@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, type ReactNode } from "react"
+import { createContext, useContext, useCallback, type ReactNode } from "react"
 import { useColorScheme } from "react-native"
 import { darkColors, lightColors, type ColorPalette } from "./theme"
+import { useSettings } from "./settings-context"
 
 interface ThemeContextType {
   colors: ColorPalette
@@ -16,16 +17,21 @@ const ThemeContext = createContext<ThemeContextType>({
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const systemScheme = useColorScheme()
-  const [override, setOverride] = useState<"light" | "dark" | null>(null)
-  const colorScheme = override ?? (systemScheme === "light" ? "light" : "dark")
-  const colors = colorScheme === "light" ? lightColors : darkColors
+  const { settings, update } = useSettings()
 
-  const toggleTheme = () => {
-    setOverride(colorScheme === "dark" ? "light" : "dark")
-  }
+  const resolvedScheme: "light" | "dark" =
+    settings.theme === "system"
+      ? (systemScheme === "light" ? "light" : "dark")
+      : settings.theme
+
+  const colors = resolvedScheme === "light" ? lightColors : darkColors
+
+  const toggleTheme = useCallback(() => {
+    update("theme", resolvedScheme === "dark" ? "light" : "dark")
+  }, [resolvedScheme, update])
 
   return (
-    <ThemeContext.Provider value={{ colors, colorScheme, toggleTheme }}>
+    <ThemeContext.Provider value={{ colors, colorScheme: resolvedScheme, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   )

@@ -1,17 +1,48 @@
-import { useState, useMemo } from "react"
-import { View, Text, ScrollView, Pressable, Switch, StyleSheet } from "react-native"
+import { useMemo, useState, useEffect, useCallback } from "react"
+import { View, Text, ScrollView, Pressable, Switch, StyleSheet, ActivityIndicator } from "react-native"
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons"
 import { useVault } from "@/lib/vault-context"
 import { useTheme } from "@/lib/theme-context"
+import { useSettings } from "@/lib/settings-context"
+import { listUserFiles, type VaultFileInfo } from "@/lib/storage"
 import { withOpacity, radius, type ColorPalette } from "@/lib/theme"
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function fileIcon(name: string, isDirectory: boolean): keyof typeof MaterialCommunityIcons.glyphMap {
+  if (isDirectory) return "folder-outline"
+  if (name.endsWith(".db")) return "database"
+  if (name.endsWith(".json")) return "code-json"
+  if (name.endsWith(".key") || name.endsWith(".pem")) return "key-variant"
+  return "file-outline"
+}
+
 export default function SettingsScreen() {
-  const { currentUser } = useVault()
+  const { currentUser, userDir } = useVault()
   const { colors, colorScheme, toggleTheme } = useTheme()
+  const { settings, update } = useSettings()
   const styles = useMemo(() => createStyles(colors), [colors])
+
+  const [files, setFiles] = useState<VaultFileInfo[]>([])
+  const [filesLoading, setFilesLoading] = useState(true)
+
+  const refreshFiles = useCallback(async () => {
+    if (!userDir) return
+    setFilesLoading(true)
+    const list = await listUserFiles(userDir)
+    setFiles(list)
+    setFilesLoading(false)
+  }, [userDir])
+
+  useEffect(() => {
+    refreshFiles()
+  }, [refreshFiles])
+
   if (!currentUser) return null
-  const [biometricEnabled, setBiometricEnabled] = useState(true)
-  const [zeroizeEnabled, setZeroizeEnabled] = useState(true)
 
   return (
     <ScrollView
@@ -67,9 +98,9 @@ export default function SettingsScreen() {
           }
           label="Biometric Unlock"
           toggle
-          checked={biometricEnabled}
+          checked={settings.biometricEnabled}
           onToggle={(v) => {
-            setBiometricEnabled(v)
+            update("biometricEnabled", v)
           }}
         />
         <View style={styles.divider} />
@@ -82,9 +113,9 @@ export default function SettingsScreen() {
           label="Zeroize on Close"
           description="Clear decrypted data from memory when app closes"
           toggle
-          checked={zeroizeEnabled}
+          checked={settings.zeroizeOnClose}
           onToggle={(v) => {
-            setZeroizeEnabled(v)
+            update("zeroizeOnClose", v)
           }}
         />
         <View style={styles.divider} />
@@ -117,37 +148,49 @@ export default function SettingsScreen() {
       </View>
 
       {/* Storage */}
-      <Text style={styles.sectionTitle}>Storage</Text>
+      <View style={styles.storageTitleRow}>
+        <Text style={styles.sectionTitle}>Storage</Text>
+        <Pressable onPress={refreshFiles} hitSlop={8}>
+          <Ionicons name="refresh" size={14} color={colors.mutedForeground} />
+        </Pressable>
+      </View>
       <View style={styles.card}>
-        <SettingRow
-          colors={colors}
-          styles={styles}
-          icon={
-            <MaterialCommunityIcons
-              name="database"
-              size={16}
-              color={colors.mutedForeground}
-            />
-          }
-          label="Personal Vault"
-          value="vault.db"
-          description="SQLCipher encrypted database"
-        />
-        <View style={styles.divider} />
-        <SettingRow
-          colors={colors}
-          styles={styles}
-          icon={
-            <MaterialCommunityIcons
-              name="harddisk"
-              size={16}
-              color={colors.mutedForeground}
-            />
-          }
-          label="Shared Vault"
-          value="shared.db"
-          description="Encrypted with shared vault keys"
-        />
+        {filesLoading ? (
+          <View style={styles.filesLoading}>
+            <ActivityIndicator size="small" color={colors.mutedForeground} />
+          </View>
+        ) : files.length === 0 ? (
+          <View style={styles.filesEmpty}>
+            <Ionicons name="folder-open-outline" size={20} color={colors.mutedForeground} />
+            <Text style={styles.filesEmptyText}>Directory is empty</Text>
+          </View>
+        ) : (
+          files.map((file, i) => (
+            <View key={file.name}>
+              {i > 0 && <View style={styles.divider} />}
+              <View style={styles.fileRow}>
+                <View style={styles.settingIcon}>
+                  <MaterialCommunityIcons
+                    name={fileIcon(file.name, file.isDirectory)}
+                    size={16}
+                    color={colors.mutedForeground}
+                  />
+                </View>
+                <View style={styles.settingContent}>
+                  <Text style={styles.settingLabel}>{file.name}</Text>
+                  <Text style={styles.settingDesc}>
+                    {file.isDirectory ? "directory" : formatBytes(file.size)}
+                  </Text>
+                </View>
+                <View style={styles.systemBadge}>
+                  <Text style={styles.systemValue}>
+                    {file.name.split(".").pop()?.toUpperCase() ?? "FILE"}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ))
+        )}
       </View>
 
       {/* System */}
@@ -421,5 +464,31 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
   signOutText: {
     fontSize: 12,
     color: colors.destructive,
+  },
+  storageTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 4,
+    marginTop: 8,
+  },
+  filesLoading: {
+    padding: 24,
+    alignItems: "center",
+  },
+  filesEmpty: {
+    padding: 24,
+    alignItems: "center",
+    gap: 6,
+  },
+  filesEmptyText: {
+    fontSize: 11,
+    color: colors.mutedForeground,
+  },
+  fileRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
   },
 })
