@@ -31,6 +31,16 @@ export async function listUsers(): Promise<string[]> {
   return entries.filter((name) => name.includes("@"))
 }
 
+/**
+ * Deletes the entire user directory and all its contents.
+ */
+export async function deleteUserDir(userDir: string): Promise<void> {
+  const info = await FileSystem.getInfoAsync(userDir)
+  if (info.exists) {
+    await FileSystem.deleteAsync(userDir, { idempotent: true })
+  }
+}
+
 export interface VaultFileInfo {
   name: string
   size: number
