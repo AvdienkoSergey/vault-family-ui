@@ -1,10 +1,11 @@
-import { useMemo, useState, useEffect, useCallback } from "react"
-import { View, Text, ScrollView, Pressable, Switch, StyleSheet, ActivityIndicator } from "react-native"
+import React, { useMemo, useState, useEffect, useCallback } from "react"
+import { View, Text, ScrollView, Pressable, Switch, StyleSheet, ActivityIndicator, Modal } from "react-native"
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons"
 import { useVault } from "@/lib/vault-context"
 import { useTheme } from "@/lib/theme-context"
 import { useSettings } from "@/lib/settings-context"
-import { listUserFiles, type VaultFileInfo } from "@/lib/storage"
+import { listUserFiles, deleteUserDir, type VaultFileInfo } from "@/lib/storage"
+import { clearCredentials } from "@/lib/security-service"
 import { withOpacity, radius, type ColorPalette } from "@/lib/theme"
 
 function formatBytes(bytes: number): string {
@@ -22,13 +23,14 @@ function fileIcon(name: string, isDirectory: boolean): keyof typeof MaterialComm
 }
 
 export default function SettingsScreen() {
-  const { currentUser, userDir } = useVault()
+  const { currentUser, userDir, lock } = useVault()
   const { colors, colorScheme, toggleTheme } = useTheme()
   const { settings, update } = useSettings()
   const styles = useMemo(() => createStyles(colors), [colors])
 
   const [files, setFiles] = useState<VaultFileInfo[]>([])
   const [filesLoading, setFilesLoading] = useState(true)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   const refreshFiles = useCallback(async () => {
     if (!userDir) return
@@ -60,7 +62,7 @@ export default function SettingsScreen() {
           <View style={styles.profileAvatar}>
             <Text style={styles.profileAvatarText}>{currentUser.avatar}</Text>
           </View>
-          <View>
+          <View style={{ flex: 1 }}>
             <View style={styles.profileNameRow}>
               <Text style={styles.profileName}>{currentUser.name}</Text>
               <View style={styles.ownerBadge}>
@@ -68,6 +70,22 @@ export default function SettingsScreen() {
               </View>
             </View>
             <Text style={styles.profileSub}>Vault Family Owner</Text>
+          </View>
+          <View style={styles.profileActions}>
+            <Pressable
+              style={styles.profileActionBtnDanger}
+              onPress={() => setShowDeleteModal(true)}
+            >
+              <Ionicons name="trash" size={14} color={colors.destructive} />
+            </Pressable>
+            <Pressable
+              style={styles.profileActionBtn}
+              onPress={() => {
+                lock()
+              }}
+            >
+              <Text style={styles.signOutText}>Sign Out</Text>
+            </Pressable>
           </View>
         </View>
       </View>
@@ -205,16 +223,49 @@ export default function SettingsScreen() {
         <SystemRow styles={styles} label="KDF" value="Argon2id" />
       </View>
 
-      {/* Sign out */}
-      <Pressable
-        style={styles.signOutBtn}
-        onPress={() => {
-          throw new Error("NOT_IMPLEMENTED: lock session, zeroize memory via WasmBridge, clear master key via SecurityService")
-        }}
+      {/* Delete Account Modal */}
+      <Modal
+        visible={showDeleteModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteModal(false)}
       >
-        <Ionicons name="log-out" size={14} color={colors.destructive} />
-        <Text style={styles.signOutText}>Lock and Sign Out</Text>
-      </Pressable>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalIconWrap}>
+              <Ionicons name="warning" size={28} color={colors.destructive} />
+            </View>
+            <Text style={styles.modalTitle}>Delete Account</Text>
+            <Text style={styles.modalDesc}>
+              This will permanently delete your vault directory and all stored data. This action cannot be undone.
+            </Text>
+            <View style={styles.modalActions}>
+              <Pressable
+                style={styles.modalCancelBtn}
+                onPress={() => setShowDeleteModal(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={styles.modalDeleteBtn}
+                onPress={async () => {
+                  try {
+                    if (userDir) await deleteUserDir(userDir)
+                    await clearCredentials()
+                  } finally {
+                    setShowDeleteModal(false)
+                    lock()
+                  }
+                }}
+              >
+                <Ionicons name="trash" size={14} color="#fff" />
+                <Text style={styles.modalDeleteText}>Delete</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </ScrollView>
   )
 }
@@ -450,20 +501,30 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     fontFamily: "monospace",
     color: colors.secondaryForeground,
   },
-  signOutBtn: {
+  profileActions: {
     flexDirection: "row",
+    gap: 8,
+  },
+  profileActionBtn: {
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: radius.md,
+    backgroundColor: colors.secondary,
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    height: 44,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: withOpacity(colors.destructive, 0.2),
-    marginTop: 8,
   },
   signOutText: {
-    fontSize: 12,
-    color: colors.destructive,
+    fontSize: 11,
+    fontWeight: "500",
+    color: colors.mutedForeground,
+  },
+  profileActionBtnDanger: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.md,
+    backgroundColor: withOpacity(colors.destructive, 0.1),
+    alignItems: "center",
+    justifyContent: "center",
   },
   storageTitleRow: {
     flexDirection: "row",
@@ -490,5 +551,76 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     alignItems: "center",
     gap: 12,
     padding: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 340,
+    backgroundColor: colors.card,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 24,
+    alignItems: "center",
+    gap: 12,
+  },
+  modalIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: withOpacity(colors.destructive, 0.12),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.foreground,
+  },
+  modalDesc: {
+    fontSize: 12,
+    color: colors.mutedForeground,
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 8,
+    width: "100%",
+  },
+  modalCancelBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.secondary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalCancelText: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: colors.foreground,
+  },
+  modalDeleteBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.destructive,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  modalDeleteText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#fff",
   },
 })
