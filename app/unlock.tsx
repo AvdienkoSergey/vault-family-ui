@@ -11,6 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons"
 import { useVault } from "@/lib/vault-context"
 import { useTheme } from "@/lib/theme-context"
+import { useSettings } from "@/lib/settings-context"
 import { withOpacity, radius, type ColorPalette } from "@/lib/theme"
 import { parseEmail, parsePassword } from "@/lib/types"
 import { listUsers } from "@/lib/storage"
@@ -21,6 +22,7 @@ type Mode = "loading" | "create" | "signin"
 export default function UnlockScreen() {
   const { unlock, unlockWithBiometrics } = useVault()
   const { colors } = useTheme()
+  const { preloadForEmail } = useSettings()
   const styles = useMemo(() => createStyles(colors), [colors])
 
   const [mode, setMode] = useState<Mode>("loading")
@@ -39,6 +41,7 @@ export default function UnlockScreen() {
         setHasBiometrics(bioAvailable)
         if (users.length > 0) {
           setEmail(users[0])
+          preloadForEmail(users[0])
           setMode("signin")
         } else {
           setMode("create")
@@ -108,7 +111,7 @@ export default function UnlockScreen() {
                       styles.userChip,
                       u === email && styles.userChipActive,
                     ]}
-                    onPress={() => { setEmail(u); setError("") }}
+                    onPress={() => { setEmail(u); preloadForEmail(u); setError("") }}
                   >
                     <Text
                       style={[

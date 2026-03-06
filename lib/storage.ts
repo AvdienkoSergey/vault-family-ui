@@ -30,3 +30,36 @@ export async function listUsers(): Promise<string[]> {
   const entries = await FileSystem.readDirectoryAsync(USERS_ROOT)
   return entries.filter((name) => name.includes("@"))
 }
+
+export interface VaultFileInfo {
+  name: string
+  size: number
+  isDirectory: boolean
+  modificationTime: number
+}
+
+/**
+ * Lists all files and folders inside the given user directory
+ * with their sizes and modification times.
+ */
+export async function listUserFiles(userDir: string): Promise<VaultFileInfo[]> {
+  const info = await FileSystem.getInfoAsync(userDir)
+  if (!info.exists) return []
+
+  const names = await FileSystem.readDirectoryAsync(userDir)
+  const results: VaultFileInfo[] = []
+
+  for (const name of names) {
+    const fileInfo = await FileSystem.getInfoAsync(`${userDir}${name}`, { size: true })
+    if (fileInfo.exists) {
+      results.push({
+        name,
+        size: fileInfo.size ?? 0,
+        isDirectory: fileInfo.isDirectory ?? false,
+        modificationTime: fileInfo.modificationTime ?? 0,
+      })
+    }
+  }
+
+  return results.sort((a, b) => a.name.localeCompare(b.name))
+}
