@@ -14,16 +14,18 @@ import { useTheme } from "@/lib/theme-context"
 import { withOpacity, radius, type ColorPalette } from "@/lib/theme"
 import { parseEmail, parsePassword } from "@/lib/types"
 import { listUsers } from "@/lib/storage"
+import { hasStoredCredentials } from "@/lib/security-service"
 
 type Mode = "loading" | "create" | "signin"
 
 export default function UnlockScreen() {
-  const { unlock } = useVault()
+  const { unlock, unlockWithBiometrics } = useVault()
   const { colors } = useTheme()
   const styles = useMemo(() => createStyles(colors), [colors])
 
   const [mode, setMode] = useState<Mode>("loading")
   const [knownUsers, setKnownUsers] = useState<string[]>([])
+  const [hasBiometrics, setHasBiometrics] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -31,15 +33,18 @@ export default function UnlockScreen() {
   const [error, setError] = useState("")
 
   useEffect(() => {
-    listUsers().then((users) => {
-      setKnownUsers(users)
-      if (users.length > 0) {
-        setEmail(users[0])
-        setMode("signin")
-      } else {
-        setMode("create")
-      }
-    })
+    Promise.all([listUsers(), hasStoredCredentials()]).then(
+      ([users, bioAvailable]) => {
+        setKnownUsers(users)
+        setHasBiometrics(bioAvailable)
+        if (users.length > 0) {
+          setEmail(users[0])
+          setMode("signin")
+        } else {
+          setMode("create")
+        }
+      },
+    )
   }, [])
 
   const isCreate = mode === "create"
@@ -193,8 +198,15 @@ export default function UnlockScreen() {
 
         {/* Footer actions */}
         <View style={styles.footer}>
-          {!isCreate && (
-            <Pressable style={styles.footerBtn}>
+          {!isCreate && hasBiometrics && (
+            <Pressable
+              style={styles.footerBtn}
+              onPress={async () => {
+                setError("")
+                const ok = await unlockWithBiometrics()
+                if (!ok) setError("Biometric authentication failed")
+              }}
+            >
               <Ionicons name="finger-print" size={20} color={colors.primary} />
               <Text style={styles.footerBtnText}>Use Biometrics</Text>
             </Pressable>
