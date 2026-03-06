@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   View,
   Text,
@@ -13,18 +13,36 @@ import { useVault } from "@/lib/vault-context"
 import { useTheme } from "@/lib/theme-context"
 import { withOpacity, radius, type ColorPalette } from "@/lib/theme"
 import { parseEmail, parsePassword } from "@/lib/types"
+import { listUsers } from "@/lib/storage"
+
+type Mode = "loading" | "create" | "signin"
 
 export default function UnlockScreen() {
   const { unlock } = useVault()
   const { colors } = useTheme()
   const styles = useMemo(() => createStyles(colors), [colors])
 
+  const [mode, setMode] = useState<Mode>("loading")
+  const [knownUsers, setKnownUsers] = useState<string[]>([])
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [isFirstRun] = useState(true) // TODO: detect from storage
   const [error, setError] = useState("")
+
+  useEffect(() => {
+    listUsers().then((users) => {
+      setKnownUsers(users)
+      if (users.length > 0) {
+        setEmail(users[0])
+        setMode("signin")
+      } else {
+        setMode("create")
+      }
+    })
+  }, [])
+
+  const isCreate = mode === "create"
 
   const handleSubmit = () => {
     setError("")
@@ -41,7 +59,7 @@ export default function UnlockScreen() {
       return
     }
 
-    if (isFirstRun && password !== confirmPassword) {
+    if (isCreate && password !== confirmPassword) {
       setError("Passwords do not match")
       return
     }
@@ -49,9 +67,11 @@ export default function UnlockScreen() {
     unlock(emailResult.value, passwordResult.value)
   }
 
-  const canSubmit = isFirstRun
+  const canSubmit = isCreate
     ? email.includes("@") && password.length >= 8 && confirmPassword.length > 0
-    : password.length >= 1
+    : email.includes("@") && password.length >= 1
+
+  if (mode === "loading") return null
 
   return (
     <KeyboardAvoidingView
@@ -66,15 +86,37 @@ export default function UnlockScreen() {
           </View>
           <Text style={styles.logoTitle}>Vault Family</Text>
           <Text style={styles.logoSub}>
-            {isFirstRun ? "Create your vault" : "Welcome back"}
+            {isCreate ? "Create your vault" : "Welcome back"}
           </Text>
         </View>
 
         {/* Form */}
         <View style={styles.card}>
-          {isFirstRun && (
-            <View style={styles.field}>
-              <Text style={styles.label}>Email</Text>
+          <View style={styles.field}>
+            <Text style={styles.label}>Email</Text>
+            {mode === "signin" && knownUsers.length > 1 ? (
+              <View style={styles.usersWrap}>
+                {knownUsers.map((u) => (
+                  <Pressable
+                    key={u}
+                    style={[
+                      styles.userChip,
+                      u === email && styles.userChipActive,
+                    ]}
+                    onPress={() => { setEmail(u); setError("") }}
+                  >
+                    <Text
+                      style={[
+                        styles.userChipText,
+                        u === email && styles.userChipTextActive,
+                      ]}
+                    >
+                      {u}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
               <TextInput
                 style={styles.input}
                 value={email}
@@ -86,8 +128,8 @@ export default function UnlockScreen() {
                 keyboardType="email-address"
                 textContentType="emailAddress"
               />
-            </View>
-          )}
+            )}
+          </View>
 
           <View style={styles.field}>
             <Text style={styles.label}>Master Password</Text>
@@ -115,7 +157,7 @@ export default function UnlockScreen() {
             </View>
           </View>
 
-          {isFirstRun && (
+          {isCreate && (
             <View style={styles.field}>
               <Text style={styles.label}>Confirm Password</Text>
               <TextInput
@@ -139,22 +181,39 @@ export default function UnlockScreen() {
             disabled={!canSubmit}
           >
             <Ionicons
-              name={isFirstRun ? "add-circle" : "lock-open"}
+              name={isCreate ? "add-circle" : "lock-open"}
               size={16}
               color={colors.primaryForeground}
             />
             <Text style={styles.submitText}>
-              {isFirstRun ? "Create Vault" : "Unlock"}
+              {isCreate ? "Create Vault" : "Sign In"}
             </Text>
           </Pressable>
         </View>
 
-        {!isFirstRun && (
-          <Pressable style={styles.biometricBtn}>
-            <Ionicons name="finger-print" size={20} color={colors.primary} />
-            <Text style={styles.biometricText}>Use Biometrics</Text>
+        {/* Footer actions */}
+        <View style={styles.footer}>
+          {!isCreate && (
+            <Pressable style={styles.footerBtn}>
+              <Ionicons name="finger-print" size={20} color={colors.primary} />
+              <Text style={styles.footerBtnText}>Use Biometrics</Text>
+            </Pressable>
+          )}
+          <Pressable
+            style={styles.footerBtn}
+            onPress={() => {
+              setMode(isCreate ? "signin" : "create")
+              setEmail(isCreate && knownUsers.length > 0 ? knownUsers[0] : "")
+              setPassword("")
+              setConfirmPassword("")
+              setError("")
+            }}
+          >
+            <Text style={styles.switchText}>
+              {isCreate ? "Already have a vault? Sign in" : "Create new vault"}
+            </Text>
           </Pressable>
-        )}
+        </View>
       </View>
     </KeyboardAvoidingView>
   )
@@ -261,16 +320,49 @@ const createStyles = (colors: ColorPalette) =>
       fontWeight: "600",
       color: colors.primaryForeground,
     },
-    biometricBtn: {
+    usersWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    userChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: radius.md,
+      backgroundColor: colors.secondary,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    userChipActive: {
+      backgroundColor: withOpacity(colors.primary, 0.15),
+      borderColor: colors.primary,
+    },
+    userChipText: {
+      fontSize: 12,
+      color: colors.mutedForeground,
+    },
+    userChipTextActive: {
+      color: colors.primary,
+      fontWeight: "500",
+    },
+    footer: {
+      alignItems: "center",
+      gap: 12,
+    },
+    footerBtn: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
       gap: 8,
-      paddingVertical: 12,
+      paddingVertical: 4,
     },
-    biometricText: {
+    footerBtnText: {
       fontSize: 13,
       color: colors.primary,
       fontWeight: "500",
+    },
+    switchText: {
+      fontSize: 12,
+      color: colors.mutedForeground,
     },
   })
