@@ -160,11 +160,11 @@ Or set JAVA_HOME manually:
 console.log(`Using JDK ${JDK_MAJOR}: ${jdk}\n`);
 
 const isWin = process.platform === "win32";
-const gradlew = isWin ? "gradlew.bat" : "./gradlew";
 const androidDir = path.join(__dirname, "..", "android");
+const gradlew = isWin ? path.join(androidDir, "gradlew.bat") : "./gradlew";
 
 try {
-  execSync(`${gradlew} assembleRelease`, {
+  execSync(`"${gradlew}" assembleRelease`, {
     cwd: androidDir,
     stdio: "inherit",
     env: { ...process.env, JAVA_HOME: jdk },
