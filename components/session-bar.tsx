@@ -8,10 +8,11 @@ import { withOpacity, type ColorPalette } from "@/lib/theme"
 
 export function SessionBar() {
   const insets = useSafeAreaInsets()
-  const { sessionState, toggleSession, currentUser } = useVault()
+  const { sessionState, lock, currentUser } = useVault()
   const { colors } = useTheme()
   const styles = useMemo(() => createStyles(colors), [colors])
   const isActive = sessionState === "active"
+  if (!currentUser) return null
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 10 }]}>
@@ -29,7 +30,7 @@ export function SessionBar() {
         </View>
 
         <Pressable
-          onPress={toggleSession}
+          onPress={lock}
           style={[
             styles.statusBadge,
             {

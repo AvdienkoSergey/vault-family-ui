@@ -1,9 +1,9 @@
-import { Stack } from "expo-router"
+import { Stack, useRouter, useSegments } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import { LogBox } from "react-native"
 import * as SplashScreen from "expo-splash-screen"
 import React, { useEffect } from "react"
-import { VaultProvider } from "@/lib/vault-context"
+import { VaultProvider, useVault } from "@/lib/vault-context"
 import { ThemeProvider, useTheme } from "@/lib/theme-context"
 
 // Keep splash visible until app signals it's ready
@@ -13,11 +13,22 @@ LogBox.ignoreLogs(["props.pointerEvents is deprecated"])
 
 function AppStack() {
   const { colors, colorScheme } = useTheme()
+  const { sessionState } = useVault()
+  const router = useRouter()
+  const segments = useSegments()
 
   useEffect(() => {
-    // Hide splash once theme + providers are mounted — no black gap
     SplashScreen.hideAsync()
   }, [])
+
+  useEffect(() => {
+    const inTabs = segments[0] === "(tabs)"
+    if (sessionState === "locked" && inTabs) {
+      router.replace("/unlock")
+    } else if (sessionState === "active" && !inTabs) {
+      router.replace("/(tabs)")
+    }
+  }, [sessionState])
 
   return (
     <>
@@ -26,8 +37,10 @@ function AppStack() {
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.background },
+          animation: "fade",
         }}
       >
+        <Stack.Screen name="unlock" />
         <Stack.Screen name="(tabs)" />
       </Stack>
     </>

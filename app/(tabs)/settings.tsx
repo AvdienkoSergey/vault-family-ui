@@ -9,6 +9,7 @@ export default function SettingsScreen() {
   const { currentUser } = useVault()
   const { colors, colorScheme, toggleTheme } = useTheme()
   const styles = useMemo(() => createStyles(colors), [colors])
+  if (!currentUser) return null
   const [biometricEnabled, setBiometricEnabled] = useState(true)
   const [zeroizeEnabled, setZeroizeEnabled] = useState(true)
 

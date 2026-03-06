@@ -1,28 +1,42 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react"
-import type { SessionState } from "./types"
-import { CURRENT_USER } from "./types"
+import type { SessionState, UserProfile } from "./types"
 
 interface VaultContextType {
-  currentUser: typeof CURRENT_USER
+  currentUser: UserProfile | null
   sessionState: SessionState
-  toggleSession: () => void
+  unlock: (name: string, password: string) => void
+  lock: () => void
 }
 
 const VaultContext = createContext<VaultContextType | null>(null)
 
 export function VaultProvider({ children }: { children: ReactNode }) {
-  const [sessionState, setSessionState] = useState<SessionState>("active")
+  const [sessionState, setSessionState] = useState<SessionState>("locked")
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null)
 
-  const toggleSession = useCallback(() => {
-    setSessionState((prev) => (prev === "active" ? "locked" : "active"))
+  const unlock = useCallback((name: string, _password: string) => {
+    // TODO: validate password via WasmBridge / derive keys
+    setCurrentUser({
+      id: "u1",
+      name,
+      role: "owner",
+      avatar: name.charAt(0).toUpperCase(),
+    })
+    setSessionState("active")
+  }, [])
+
+  const lock = useCallback(() => {
+    setCurrentUser(null)
+    setSessionState("locked")
   }, [])
 
   return (
     <VaultContext.Provider
       value={{
-        currentUser: CURRENT_USER,
+        currentUser,
         sessionState,
-        toggleSession,
+        unlock,
+        lock,
       }}
     >
       {children}
