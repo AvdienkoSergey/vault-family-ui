@@ -87,12 +87,7 @@ export default function SettingsScreen() {
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName} numberOfLines={1}>{currentUser.name}</Text>
-            <Pressable
-              style={styles.profileActionBtn}
-              onPress={() => lock()}
-            >
-              <Text style={styles.signOutText}>Sign Out</Text>
-            </Pressable>
+            <Text style={styles.profileSub}>Vault Family Owner</Text>
           </View>
           <View style={styles.profileActions}>
             <Pressable
@@ -106,7 +101,7 @@ export default function SettingsScreen() {
                 setShowTransferModal(true)
               }}
             >
-              <Ionicons name="sync" size={14} color="#fff" />
+              <Ionicons name="sync" size={14} color="#22c55e" />
               <Text style={styles.profileSyncText}>Sync</Text>
             </Pressable>
             <Pressable
@@ -680,6 +675,10 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     fontWeight: "600",
     color: colors.foreground,
   },
+  profileSub: {
+    fontSize: 12,
+    color: colors.mutedForeground,
+  },
   settingRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -727,25 +726,11 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
   profileActions: {
     gap: 6,
   },
-  profileActionBtn: {
-    height: 28,
-    paddingHorizontal: 10,
-    borderRadius: radius.md,
-    backgroundColor: colors.secondary,
-    alignItems: "center",
-    justifyContent: "center",
-    alignSelf: "flex-start",
-  },
-  signOutText: {
-    fontSize: 11,
-    fontWeight: "500",
-    color: colors.mutedForeground,
-  },
   profileSyncBtn: {
     height: 32,
     paddingHorizontal: 12,
     borderRadius: radius.md,
-    backgroundColor: "#22c55e",
+    backgroundColor: withOpacity("#22c55e", 0.15),
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -754,7 +739,7 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
   profileSyncText: {
     fontSize: 11,
     fontWeight: "600",
-    color: "#fff",
+    color: "#22c55e",
   },
   profileDeleteBtn: {
     height: 32,
