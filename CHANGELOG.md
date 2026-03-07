@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.3.0](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.2.1...v1.3.0) (2026-03-07)
+
+
+### Features
+
+* **auth:** verify master password via WASM and derive encryption key ([17ac992](https://github.com/AvdienkoSergey/vault-family-ui/commit/17ac99279f4bbbbfdcf4abe9bc4c6493971c1a36))
+* **ci:** add iOS simulator build to release workflow ([65a3d60](https://github.com/AvdienkoSergey/vault-family-ui/commit/65a3d602e63fe233106a1777b8d30155a3da57ca))
+* **clipboard:** implement copyToClipboard with expo-clipboard ([bf3c854](https://github.com/AvdienkoSergey/vault-family-ui/commit/bf3c85449475246da8f501087a2109a3efd144ab))
+* **crypto:** add Rust WASM crypto module (vault-crypto-wasm) ([0ae89f1](https://github.com/AvdienkoSergey/vault-family-ui/commit/0ae89f10dedc9b414d97ddcfaf1c4849011d8d58))
+* **generator:** replace Math.random with WASM CSPRNG password generator ([1b8147e](https://github.com/AvdienkoSergey/vault-family-ui/commit/1b8147e1c6b3c6911c3772601041dac42e6afd77))
+* **security:** implement auto-lock on app background timeout ([b29ac75](https://github.com/AvdienkoSergey/vault-family-ui/commit/b29ac754f27808adc81ca3c4fea21c67c50a48eb))
+* **settings:** add change master password and auto-lock timeout picker ([cd195bf](https://github.com/AvdienkoSergey/vault-family-ui/commit/cd195bfec3feb5a4c352ace19670be3c4e3e0b47))
+* **wasm:** integrate WASM bridge with Metro bundling and full crypto API ([140e4c0](https://github.com/AvdienkoSergey/vault-family-ui/commit/140e4c0bdd72d71c6379fbe2f0dcb462b67fa044))
+
+
+### Bug Fixes
+
+* **unlock:** add biometric enrollment modal and password error handling ([048eaa4](https://github.com/AvdienkoSergey/vault-family-ui/commit/048eaa4e35cc1c577d4f66f6aefa594cbfc60290))
+
+
+### Miscellaneous Chores
+
+* add new folder in gitignore ([9f19f58](https://github.com/AvdienkoSergey/vault-family-ui/commit/9f19f58d767f59758d1d4cadb69903a66187a131))
+
 ## [1.2.1](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.2.0...v1.2.1) (2026-03-07)
 
 
