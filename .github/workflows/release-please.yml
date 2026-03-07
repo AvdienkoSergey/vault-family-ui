@@ -94,18 +94,28 @@ jobs:
 
       - name: Build iOS Simulator (Release)
         run: |
+          set -eo pipefail
+          echo "Building scheme: ${{ steps.scheme.outputs.name }}"
           xcodebuild -workspace ios/*.xcworkspace \
             -scheme "${{ steps.scheme.outputs.name }}" \
             -configuration Release \
             -sdk iphonesimulator \
             -derivedDataPath $RUNNER_TEMP/build \
             CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGNING_REQUIRED=NO \
+            build 2>&1 | tail -50
 
       - name: Archive .app for release
         run: |
-          APP_DIR=$(find $RUNNER_TEMP/build/Build/Products -name "*.app" -type d | head -1)
-          if [ -z "$APP_DIR" ]; then echo "No .app bundle found"; exit 1; fi
+          echo "Searching for .app bundle in $RUNNER_TEMP/build..."
+          find $RUNNER_TEMP/build -name "*.app" -type d 2>/dev/null || true
+          APP_DIR=$(find $RUNNER_TEMP/build -name "*.app" -type d | head -1)
+          if [ -z "$APP_DIR" ]; then
+            echo "No .app found. Listing build directory structure:"
+            find $RUNNER_TEMP/build -maxdepth 4 -type d 2>/dev/null || true
+            exit 1
+          fi
+          echo "Found: $APP_DIR"
           tar -czf $RUNNER_TEMP/VaultFamily-ios-simulator.tar.gz -C "$(dirname "$APP_DIR")" "$(basename "$APP_DIR")"
 
       - name: Upload iOS build to release
