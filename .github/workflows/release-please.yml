@@ -89,7 +89,17 @@ jobs:
       - name: Resolve iOS scheme name
         id: scheme
         run: |
-          SCHEME=$(xcodebuild -workspace ios/*.xcworkspace -list 2>/dev/null | sed -n '/Schemes:/,/^$/{ /Schemes:/d; /^$/d; s/^[[:space:]]*//; p; }' | head -1)
+          echo "=== All available schemes ==="
+          xcodebuild -workspace ios/*.xcworkspace -list 2>/dev/null || true
+          echo ""
+          ALL_SCHEMES=$(xcodebuild -workspace ios/*.xcworkspace -list 2>/dev/null | sed -n '/Schemes:/,/^$/{ /Schemes:/d; /^$/d; s/^[[:space:]]*//; p; }')
+          echo "Parsed schemes: $ALL_SCHEMES"
+          # Prefer the app scheme (not Pods-*), pick first non-Pods scheme
+          SCHEME=$(echo "$ALL_SCHEMES" | grep -v "^Pods" | head -1)
+          if [ -z "$SCHEME" ]; then
+            SCHEME=$(echo "$ALL_SCHEMES" | head -1)
+          fi
+          echo "Selected scheme: $SCHEME"
           echo "name=$SCHEME" >> "$GITHUB_OUTPUT"
 
       - name: Build iOS Simulator (Release)
@@ -103,16 +113,30 @@ jobs:
             -derivedDataPath $RUNNER_TEMP/build \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
-            build 2>&1 | tail -50
+            build 2>&1 | tee $RUNNER_TEMP/xcodebuild.log | tail -100
+          echo "--- Build exit code: ${PIPESTATUS[0]} ---"
+
+      - name: Show build errors (if any)
+        if: failure()
+        run: |
+          echo "=== ERRORS AND WARNINGS ==="
+          grep -E "(error:|fatal error:|BUILD FAILED)" $RUNNER_TEMP/xcodebuild.log | head -50 || true
+          echo ""
+          echo "=== LAST 200 LINES ==="
+          tail -200 $RUNNER_TEMP/xcodebuild.log || true
 
       - name: Archive .app for release
         run: |
-          echo "Searching for .app bundle in $RUNNER_TEMP/build..."
+          echo "=== Full Products directory ==="
+          find $RUNNER_TEMP/build/Build/Products -maxdepth 3 2>/dev/null || true
+          echo ""
+          echo "=== Searching for .app bundles ==="
           find $RUNNER_TEMP/build -name "*.app" -type d 2>/dev/null || true
           APP_DIR=$(find $RUNNER_TEMP/build -name "*.app" -type d | head -1)
           if [ -z "$APP_DIR" ]; then
-            echo "No .app found. Listing build directory structure:"
-            find $RUNNER_TEMP/build -maxdepth 4 -type d 2>/dev/null || true
+            echo "No .app found."
+            echo "=== Full build tree (depth 5) ==="
+            find $RUNNER_TEMP/build -maxdepth 5 -type d 2>/dev/null || true
             exit 1
           fi
           echo "Found: $APP_DIR"
