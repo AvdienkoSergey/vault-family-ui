@@ -253,18 +253,6 @@ export default function SettingsScreen() {
         )}
       </View>
 
-      {/* System */}
-      <Text style={styles.sectionTitle}>System</Text>
-      <View style={styles.card}>
-        <SystemRow styles={styles} label="Backend" value="Rust / Axum" />
-        <View style={styles.divider} />
-        <SystemRow styles={styles} label="Encryption" value="AES-256-GCM" />
-        <View style={styles.divider} />
-        <SystemRow styles={styles} label="Key Exchange" value="X25519" />
-        <View style={styles.divider} />
-        <SystemRow styles={styles} label="KDF" value="PBKDF2 (600K)" />
-      </View>
-
       {/* Delete Account Modal */}
       <Modal
         visible={showDeleteModal}
@@ -631,24 +619,6 @@ function SettingRow({
   return <View style={styles.settingRow}>{content}</View>
 }
 
-function SystemRow({
-  styles,
-  label,
-  value,
-}: {
-  styles: ReturnType<typeof createStyles>
-  label: string
-  value: string
-}) {
-  return (
-    <View style={styles.systemRow}>
-      <Text style={styles.systemLabel}>{label}</Text>
-      <View style={styles.systemBadge}>
-        <Text style={styles.systemValue}>{value}</Text>
-      </View>
-    </View>
-  )
-}
 
 const createStyles = (colors: ColorPalette) => StyleSheet.create({
   container: {
@@ -767,16 +737,6 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     fontSize: 12,
     color: colors.mutedForeground,
     fontFamily: "monospace",
-  },
-  systemRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 12,
-  },
-  systemLabel: {
-    fontSize: 12,
-    color: colors.foreground,
   },
   systemBadge: {
     backgroundColor: colors.secondary,
