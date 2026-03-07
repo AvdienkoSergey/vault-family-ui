@@ -41,6 +41,16 @@ export async function deleteUserDir(userDir: string): Promise<void> {
   }
 }
 
+/**
+ * Deletes the entire users/ directory (all vaults).
+ */
+export async function deleteAllUsers(): Promise<void> {
+  const info = await FileSystem.getInfoAsync(USERS_ROOT)
+  if (info.exists) {
+    await FileSystem.deleteAsync(USERS_ROOT, { idempotent: true })
+  }
+}
+
 export interface VaultFileInfo {
   name: string
   size: number

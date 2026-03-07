@@ -291,7 +291,7 @@ function MemberCard({
             <Pressable
               style={styles.revokeConfirmBtn}
               onPress={() => {
-                throw new Error("NOT_IMPLEMENTED: revoke member access, trigger re-keying of all shared vaults via WasmBridge.deriveSharedKey")
+                throw new Error("NOT_IMPLEMENTED: revoke member access, trigger re-keying of all shared vaults via CryptoBridge.deriveSharedKey")
               }}
             >
               <Text style={styles.revokeConfirmText}>Confirm Revoke</Text>
@@ -353,7 +353,7 @@ function VaultDetail({
           <Pressable
             style={styles.addBtn}
             onPress={() => {
-              throw new Error("NOT_IMPLEMENTED: add entry to shared vault, encrypt via WasmBridge with shared key")
+              throw new Error("NOT_IMPLEMENTED: add entry to shared vault, encrypt via CryptoBridge with shared key")
             }}
           >
             <Ionicons
@@ -463,7 +463,7 @@ function InviteModal({ onClose }: { onClose: () => void }) {
           <Pressable
             style={styles.modalPrimaryBtn}
             onPress={() => {
-              throw new Error("NOT_IMPLEMENTED: send invitation, initiate X25519 key exchange via WasmBridge.deriveSharedKey")
+              throw new Error("NOT_IMPLEMENTED: send invitation, initiate X25519 key exchange via CryptoBridge.deriveSharedKey")
             }}
           >
             <Text style={styles.modalPrimaryText}>Send Invitation</Text>
@@ -497,7 +497,7 @@ function NewVaultModal({ onClose }: { onClose: () => void }) {
           <Pressable
             style={styles.modalPrimaryBtn}
             onPress={() => {
-              throw new Error("NOT_IMPLEMENTED: create shared vault in shared.db, generate vault key via WasmBridge")
+              throw new Error("NOT_IMPLEMENTED: create shared vault in shared.db, generate vault key via CryptoBridge")
             }}
           >
             <Text style={styles.modalPrimaryText}>Create Vault</Text>

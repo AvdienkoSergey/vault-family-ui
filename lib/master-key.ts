@@ -1,6 +1,6 @@
 /**
  * Master key management — stores password hash + encryption salt per user.
- * Uses WASM crypto module (PBKDF2 600K iterations, PHC format).
+ * Uses native PBKDF2-HMAC-SHA256 (100K iterations, PHC format).
  */
 import * as FileSystem from "expo-file-system"
 import type { Email, Password } from "./types"
@@ -9,7 +9,7 @@ import {
   verifyMasterPassword,
   deriveEncryptionKey,
   generateEncryptionSalt,
-} from "./wasm-bridge"
+} from "./crypto-bridge"
 
 const USERS_ROOT = `${FileSystem.documentDirectory}users/`
 const MASTER_KEY_FILE = "master.key"
@@ -44,9 +44,9 @@ export async function createMasterKey(
   email: Email,
   password: Password,
 ): Promise<string> {
-  const { hash } = hashMasterPassword(password)
+  const { hash } = await hashMasterPassword(password)
   const encryption_salt = generateEncryptionSalt()
-  const encryptionKey = deriveEncryptionKey(password, encryption_salt)
+  const encryptionKey = await deriveEncryptionKey(password, encryption_salt)
 
   const data: MasterKeyData = { hash, encryption_salt, version: 1 }
 
@@ -76,9 +76,9 @@ export async function verifyAndDeriveKey(
   const raw = await FileSystem.readAsStringAsync(path)
   const data = JSON.parse(raw) as MasterKeyData
 
-  if (!verifyMasterPassword(password, data.hash)) return null
+  if (!await verifyMasterPassword(password, data.hash)) return null
 
-  return deriveEncryptionKey(password, data.encryption_salt)
+  return await deriveEncryptionKey(password, data.encryption_salt)
 }
 
 /**
@@ -98,11 +98,11 @@ export async function changeMasterPassword(
   const raw = await FileSystem.readAsStringAsync(path)
   const data = JSON.parse(raw) as MasterKeyData
 
-  if (!verifyMasterPassword(oldPassword, data.hash)) return null
+  if (!await verifyMasterPassword(oldPassword, data.hash)) return null
 
   // Re-hash with new password, keep the same encryption_salt
-  const { hash: newHash } = hashMasterPassword(newPassword)
-  const newKey = deriveEncryptionKey(newPassword, data.encryption_salt)
+  const { hash: newHash } = await hashMasterPassword(newPassword)
+  const newKey = await deriveEncryptionKey(newPassword, data.encryption_salt)
 
   const updated: MasterKeyData = { ...data, hash: newHash }
   await FileSystem.writeAsStringAsync(path, JSON.stringify(updated))

@@ -69,7 +69,7 @@ export default function VaultScreen() {
           <Pressable
             style={styles.addBtn}
             onPress={() => {
-              throw new Error("NOT_IMPLEMENTED: navigate to Add Entry screen (encrypt via WasmBridge before saving)")
+              throw new Error("NOT_IMPLEMENTED: navigate to Add Entry screen (encrypt via CryptoBridge before saving)")
             }}
           >
             <Ionicons name="add" size={14} color={colors.primaryForeground} />

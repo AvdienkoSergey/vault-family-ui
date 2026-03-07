@@ -93,7 +93,7 @@ export function EntryDetail({ entry, onBack }: EntryDetailProps) {
         <Pressable
           style={styles.deleteBtn}
           onPress={() => {
-            throw new Error("NOT_IMPLEMENTED: confirm deletion and remove entry from vault.db via WasmBridge")
+            throw new Error("NOT_IMPLEMENTED: confirm deletion and remove entry from vault.db via CryptoBridge")
           }}
         >
           <Ionicons name="trash-outline" size={14} color={colors.destructive} />
