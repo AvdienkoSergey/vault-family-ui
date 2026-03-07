@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.2](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.3.1...v1.3.2) (2026-03-07)
+
+
+### Bug Fixes
+
+* **ci:** patch import.meta.url for Hermes and auto-detect iOS scheme ([8500246](https://github.com/AvdienkoSergey/vault-family-ui/commit/8500246fe35c3afa018306b3d8ebde859a90526d))
+* **ci:** patch import.meta.url for Hermes and auto-detect iOS scheme ([e4bd28d](https://github.com/AvdienkoSergey/vault-family-ui/commit/e4bd28d78b4b5846e46693c4a51c810fdf5b4cb2))
+
 ## [1.3.1](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.3.0...v1.3.1) (2026-03-07)
 
 
