@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.6.0](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.5.3...v1.6.0) (2026-03-07)
+
+
+### Features
+
+* add encrypted backup/restore archive service ([6ae8850](https://github.com/AvdienkoSergey/vault-family-ui/commit/6ae885046a2a81c44647703813b6732fa76d482b))
+
+
+### Bug Fixes
+
+* **ios:** fix AES.GCM.SealedBox init — remove duplicate nonce parameter ([40b85c0](https://github.com/AvdienkoSergey/vault-family-ui/commit/40b85c0ecde55893a9914f4d1ec3a9baa29e22f0))
+
 ## [1.5.3](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.5.2...v1.5.3) (2026-03-07)
 
 
