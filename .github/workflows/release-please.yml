@@ -86,10 +86,16 @@ jobs:
       - name: Install CocoaPods
         run: cd ios && pod install
 
+      - name: Resolve iOS scheme name
+        id: scheme
+        run: |
+          SCHEME=$(xcodebuild -workspace ios/*.xcworkspace -list 2>/dev/null | sed -n '/Schemes:/,/^$/{ /Schemes:/d; /^$/d; s/^[[:space:]]*//; p; }' | head -1)
+          echo "name=$SCHEME" >> "$GITHUB_OUTPUT"
+
       - name: Build iOS Simulator (Release)
         run: |
           xcodebuild -workspace ios/*.xcworkspace \
-            -scheme VaultFamily \
+            -scheme "${{ steps.scheme.outputs.name }}" \
             -configuration Release \
             -sdk iphonesimulator \
             -derivedDataPath $RUNNER_TEMP/build \
