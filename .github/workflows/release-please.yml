@@ -94,16 +94,13 @@ jobs:
           echo ""
           ALL_SCHEMES=$(xcodebuild -workspace ios/*.xcworkspace -list 2>/dev/null | sed -n '/Schemes:/,/^$/{ /Schemes:/d; /^$/d; s/^[[:space:]]*//; p; }')
           echo "Parsed schemes:"
-          echo "$ALL_SCHEMES" | cat -A
-          # Prefer the app scheme (not Pods-*), pick first non-Pods non-empty scheme
-          SCHEME=$(echo "$ALL_SCHEMES" | grep -v "^Pods" | grep -v "^$" | head -1)
+          echo "$ALL_SCHEMES"
+          # Match scheme to workspace name (the app target)
+          WS_NAME=$(basename ios/*.xcworkspace .xcworkspace)
+          SCHEME=$(echo "$ALL_SCHEMES" | grep -x "$WS_NAME" | head -1)
           if [ -z "$SCHEME" ]; then
-            SCHEME=$(echo "$ALL_SCHEMES" | grep -v "^$" | head -1)
-          fi
-          # Fallback: derive from xcworkspace filename
-          if [ -z "$SCHEME" ]; then
-            SCHEME=$(basename ios/*.xcworkspace .xcworkspace)
-            echo "WARNING: No scheme from xcodebuild -list, falling back to workspace name: $SCHEME"
+            echo "WARNING: No exact match for '$WS_NAME', falling back to workspace name"
+            SCHEME="$WS_NAME"
           fi
           echo "Selected scheme: '$SCHEME'"
           echo "name=$SCHEME" >> "$GITHUB_OUTPUT"
