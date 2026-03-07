@@ -46,11 +46,6 @@ export default function SettingsScreen() {
   // Auto-lock picker
   const [showAutoLockPicker, setShowAutoLockPicker] = useState(false)
 
-  // Category management
-  const [newCategory, setNewCategory] = useState("")
-  const [editingCatIdx, setEditingCatIdx] = useState<number | null>(null)
-  const [editingCatValue, setEditingCatValue] = useState("")
-
   // Transfer modal
   const [showTransferModal, setShowTransferModal] = useState(false)
   const [transferCode, setTransferCode] = useState("")
@@ -178,85 +173,6 @@ export default function SettingsScreen() {
             setShowChangePwModal(true)
           }}
         />
-      </View>
-
-      {/* Categories */}
-      <Text style={styles.sectionTitle}>Categories</Text>
-      <View style={styles.card}>
-        {settings.categories.map((cat, i) => (
-          <View key={`${cat}-${i}`}>
-            {i > 0 && <View style={styles.divider} />}
-            <View style={styles.catRow}>
-              {editingCatIdx === i ? (
-                <TextInput
-                  style={styles.catInput}
-                  value={editingCatValue}
-                  onChangeText={setEditingCatValue}
-                  autoFocus
-                  onSubmitEditing={() => {
-                    const trimmed = editingCatValue.trim()
-                    if (trimmed && trimmed !== cat) {
-                      const next = [...settings.categories]
-                      next[i] = trimmed
-                      update("categories", next)
-                    }
-                    setEditingCatIdx(null)
-                  }}
-                  onBlur={() => setEditingCatIdx(null)}
-                />
-              ) : (
-                <Pressable
-                  style={styles.catLabel}
-                  onPress={() => {
-                    setEditingCatIdx(i)
-                    setEditingCatValue(cat)
-                  }}
-                >
-                  <Text style={styles.settingLabel}>{cat}</Text>
-                </Pressable>
-              )}
-              <Pressable
-                hitSlop={8}
-                onPress={() => {
-                  const next = settings.categories.filter((_, j) => j !== i)
-                  update("categories", next)
-                }}
-              >
-                <Ionicons name="close-circle" size={16} color={colors.mutedForeground} />
-              </Pressable>
-            </View>
-          </View>
-        ))}
-        {settings.categories.length > 0 && <View style={styles.divider} />}
-        <View style={styles.catAddRow}>
-          <TextInput
-            style={styles.catAddInput}
-            value={newCategory}
-            onChangeText={setNewCategory}
-            placeholder="New category..."
-            placeholderTextColor={colors.mutedForeground}
-            onSubmitEditing={() => {
-              const trimmed = newCategory.trim()
-              if (trimmed && !settings.categories.includes(trimmed)) {
-                update("categories", [...settings.categories, trimmed])
-                setNewCategory("")
-              }
-            }}
-          />
-          <Pressable
-            style={[styles.catAddBtn, !newCategory.trim() && { opacity: 0.3 }]}
-            disabled={!newCategory.trim()}
-            onPress={() => {
-              const trimmed = newCategory.trim()
-              if (trimmed && !settings.categories.includes(trimmed)) {
-                update("categories", [...settings.categories, trimmed])
-                setNewCategory("")
-              }
-            }}
-          >
-            <Ionicons name="add" size={16} color={colors.primary} />
-          </Pressable>
-        </View>
       </View>
 
       {/* Storage */}
@@ -845,52 +761,6 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     fontSize: 11,
     fontWeight: "500",
     color: colors.destructive,
-  },
-  catRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  catLabel: {
-    flex: 1,
-  },
-  catInput: {
-    flex: 1,
-    height: 32,
-    fontSize: 12,
-    color: colors.foreground,
-    backgroundColor: colors.input,
-    borderRadius: radius.md,
-    paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  catAddRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    padding: 12,
-  },
-  catAddInput: {
-    flex: 1,
-    height: 36,
-    fontSize: 12,
-    color: colors.foreground,
-    backgroundColor: colors.input,
-    borderRadius: radius.md,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  catAddBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.md,
-    backgroundColor: withOpacity(colors.primary, 0.12),
-    alignItems: "center",
-    justifyContent: "center",
   },
   storageTitleRow: {
     flexDirection: "row",

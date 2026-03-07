@@ -209,7 +209,6 @@ export default function VaultScreen() {
       <AddEntryModal
         visible={showAddModal}
         colors={colors}
-        categories={categories}
         onClose={() => setShowAddModal(false)}
         onAdd={(entry) => {
           addEntry(entry)
@@ -227,27 +226,37 @@ export default function VaultScreen() {
 function AddEntryModal({
   visible,
   colors,
-  categories,
   onClose,
   onAdd,
 }: {
   visible: boolean
   colors: ColorPalette
-  categories: string[]
   onClose: () => void
   onAdd: (entry: Omit<VaultEntry, "id">) => void
 }) {
   const styles = useMemo(() => createStyles(colors), [colors])
+  const { settings, update } = useSettings()
+  const categories = settings.categories
   const [title, setTitle] = useState("")
   const [url, setUrl] = useState("")
   const [login, setLogin] = useState("")
   const [password, setPassword] = useState("")
   const [category, setCategory] = useState(categories[0] ?? "")
+  const [newCat, setNewCat] = useState("")
   const [vaultType, setVaultType] = useState<VaultType>("personal")
 
   const reset = () => {
     setTitle(""); setUrl(""); setLogin(""); setPassword("")
-    setCategory(categories[0] ?? ""); setVaultType("personal")
+    setCategory(categories[0] ?? ""); setNewCat(""); setVaultType("personal")
+  }
+
+  const addNewCategory = () => {
+    const trimmed = newCat.trim()
+    if (trimmed && !categories.includes(trimmed)) {
+      update("categories", [...categories, trimmed])
+      setCategory(trimmed)
+      setNewCat("")
+    }
   }
 
   const handleSubmit = () => {
@@ -325,14 +334,17 @@ function AddEntryModal({
               secureTextEntry
             />
 
-            {categories.length > 0 && (
-              <Text style={styles.inputLabel}>CATEGORY</Text>
-            )}
+            <Text style={styles.inputLabel}>CATEGORY</Text>
             <View style={styles.categoryRow}>
               {categories.map((cat) => (
                 <Pressable
                   key={cat}
                   onPress={() => setCategory(cat)}
+                  onLongPress={() => {
+                    const next = categories.filter((c) => c !== cat)
+                    update("categories", next)
+                    if (category === cat) setCategory(next[0] ?? "")
+                  }}
                   style={[
                     styles.categoryChip,
                     category === cat && styles.categoryChipActive,
@@ -348,6 +360,23 @@ function AddEntryModal({
                   </Text>
                 </Pressable>
               ))}
+            </View>
+            <View style={styles.newCatRow}>
+              <TextInput
+                style={styles.newCatInput}
+                value={newCat}
+                onChangeText={setNewCat}
+                placeholder="New category..."
+                placeholderTextColor={colors.mutedForeground}
+                onSubmitEditing={addNewCategory}
+              />
+              <Pressable
+                style={[styles.newCatBtn, !newCat.trim() && { opacity: 0.3 }]}
+                disabled={!newCat.trim()}
+                onPress={addNewCategory}
+              >
+                <Ionicons name="add" size={14} color={colors.primary} />
+              </Pressable>
             </View>
 
             <Text style={styles.inputLabel}>VAULT</Text>
@@ -668,6 +697,31 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
   },
   categoryChipTextActive: {
     color: colors.primaryForeground,
+  },
+  newCatRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
+  },
+  newCatInput: {
+    flex: 1,
+    height: 32,
+    fontSize: 12,
+    color: colors.foreground,
+    backgroundColor: colors.secondary,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 10,
+  },
+  newCatBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.sm,
+    backgroundColor: withOpacity(colors.primary, 0.12),
+    alignItems: "center",
+    justifyContent: "center",
   },
   vaultTypeRow: {
     flexDirection: "row",

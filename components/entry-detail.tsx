@@ -24,8 +24,9 @@ export function EntryDetail({ entry, onBack, onSave, onDelete }: EntryDetailProp
   const [editPassword, setEditPassword] = useState(entry.password)
   const [editCategory, setEditCategory] = useState(entry.category)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [newCat, setNewCat] = useState("")
   const { colors } = useTheme()
-  const { settings } = useSettings()
+  const { settings, update } = useSettings()
   const styles = useMemo(() => createStyles(colors), [colors])
   const isShared = entry.vaultType === "shared"
 
@@ -215,7 +216,7 @@ export function EntryDetail({ entry, onBack, onSave, onDelete }: EntryDetailProp
       </View>
 
       {/* Category picker (editing mode) */}
-      {isEditing && settings.categories.length > 0 && (
+      {isEditing && (
         <View style={styles.categorySection}>
           <Text style={styles.fieldLabel}>CATEGORY</Text>
           <View style={styles.categoryRow}>
@@ -223,6 +224,11 @@ export function EntryDetail({ entry, onBack, onSave, onDelete }: EntryDetailProp
               <Pressable
                 key={cat}
                 onPress={() => setEditCategory(cat)}
+                onLongPress={() => {
+                  const next = settings.categories.filter((c) => c !== cat)
+                  update("categories", next)
+                  if (editCategory === cat) setEditCategory(next[0] ?? "")
+                }}
                 style={[
                   styles.categoryChip,
                   editCategory === cat && styles.categoryChipActive,
@@ -238,6 +244,37 @@ export function EntryDetail({ entry, onBack, onSave, onDelete }: EntryDetailProp
                 </Text>
               </Pressable>
             ))}
+          </View>
+          <View style={styles.newCatRow}>
+            <TextInput
+              style={styles.newCatInput}
+              value={newCat}
+              onChangeText={setNewCat}
+              placeholder="New category..."
+              placeholderTextColor={colors.mutedForeground}
+              onSubmitEditing={() => {
+                const trimmed = newCat.trim()
+                if (trimmed && !settings.categories.includes(trimmed)) {
+                  update("categories", [...settings.categories, trimmed])
+                  setEditCategory(trimmed)
+                  setNewCat("")
+                }
+              }}
+            />
+            <Pressable
+              style={[styles.newCatBtn, !newCat.trim() && { opacity: 0.3 }]}
+              disabled={!newCat.trim()}
+              onPress={() => {
+                const trimmed = newCat.trim()
+                if (trimmed && !settings.categories.includes(trimmed)) {
+                  update("categories", [...settings.categories, trimmed])
+                  setEditCategory(trimmed)
+                  setNewCat("")
+                }
+              }}
+            >
+              <Ionicons name="add" size={14} color={colors.primary} />
+            </Pressable>
           </View>
         </View>
       )}
@@ -626,6 +663,31 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
   },
   categoryChipTextActive: {
     color: colors.primaryForeground,
+  },
+  newCatRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
+  },
+  newCatInput: {
+    flex: 1,
+    height: 32,
+    fontSize: 12,
+    color: colors.foreground,
+    backgroundColor: colors.secondary,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 10,
+  },
+  newCatBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.sm,
+    backgroundColor: withOpacity(colors.primary, 0.12),
+    alignItems: "center",
+    justifyContent: "center",
   },
   zeroizeHint: {
     flexDirection: "row",
