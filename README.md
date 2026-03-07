@@ -28,6 +28,7 @@ lib/                    # Business logic
 +-- settings.ts         # Settings persistence
 +-- settings-context.tsx
 +-- clipboard.ts        # Clipboard (expo-clipboard)
++-- archive-service.ts  # Encrypted backup/restore
 +-- use-auto-lock.ts    # Auto-lock on background timeout
 +-- theme-context.tsx / theme.ts
 +-- types.ts            # Branded types, validation
@@ -118,6 +119,60 @@ CREATE TABLE entries (
 
 **Plaintext metadata** (category, favorite, lastModified) allows filtering/sorting without decryption.
 
+## Encrypted Backup (Archive Service)
+
+### Triple protection
+
+```
+TLS (transport) → Archive encryption (PBKDF2 + AES-256-GCM) → Entry encryption (Vault Key)
+```
+
+### Export flow
+
+```
+User files (master.key, settings.json, vault_*.db)
+      |
+      v
+JSON manifest (files encoded as base64)
+      |
+      v
+UTF-8 → hex → encryptRaw(manifestHex, archiveKey)
+      |
+      v
+ArchiveBlob { encrypted_data, nonce, salt, version: 1 }
+```
+
+`archiveKey` = `deriveEncryptionKey(masterPassword, freshSalt)` — 600K PBKDF2 iterations.
+
+### Import flow
+
+```
+ArchiveBlob + master password
+      |
+      v
+archiveKey = deriveEncryptionKey(password, salt)
+      |
+      v
+decryptRaw → hex → UTF-8 → JSON.parse → manifest
+      |
+      v
+Validate filenames (allowlist) → write to user directory
+      |
+      v
+Standard unlock (master.key already contains vault_key)
+```
+
+### Security measures
+
+- **Filename allowlist**: only `master.key`, `settings.json`, `vault_*.db`
+- **Path traversal prevention**: rejects `..`, `/`, `\` in filenames
+- **Wrong password**: AES-GCM tag mismatch → error (no crash)
+- **No new dependencies**: uses existing `crypto-bridge.ts` primitives
+
+### Serialization format
+
+Archives serialize to a string with magic prefix `VFARCHIVE1:` + JSON. Functions: `serializeArchive()` / `deserializeArchive()`.
+
 ## Authentication Flow
 
 1. **Vault creation** — PBKDF2 hashes password (PHC format), generates random Vault Key, encrypts it with Master Key, saves to `master.key` (v2)
@@ -159,6 +214,7 @@ yarn build:android   # Android APK
 - Password generator (CSPRNG)
 - Multi-user support
 - Auto-migration v1 -> v2 with entry re-encryption
+- Encrypted backup/restore (archive-service)
 
 ## TODO
 
