@@ -76,7 +76,7 @@ public class ExpoVaultCryptoModule: Module {
             let nonce = try AES.GCM.Nonce(data: Data(hex: nonceHex))
             let ciphertextAndTag = try Data(hex: ciphertextHex)
 
-            let sealedBox = try AES.GCM.SealedBox(nonce: nonce, combined: nonce + ciphertextAndTag)
+            let sealedBox = try AES.GCM.SealedBox(combined: nonce + ciphertextAndTag)
             let plaintext = try AES.GCM.open(sealedBox, using: key)
             guard let result = String(data: plaintext, encoding: .utf8) else {
                 throw CryptoError("Decrypted data is not valid UTF-8")
@@ -112,7 +112,7 @@ public class ExpoVaultCryptoModule: Module {
             let nonce = try AES.GCM.Nonce(data: Data(hex: nonceHex))
             let ciphertextAndTag = try Data(hex: ciphertextHex)
 
-            let sealedBox = try AES.GCM.SealedBox(nonce: nonce, combined: nonce + ciphertextAndTag)
+            let sealedBox = try AES.GCM.SealedBox(combined: nonce + ciphertextAndTag)
             let plaintext = try AES.GCM.open(sealedBox, using: key)
             return plaintext.hexString
         }
