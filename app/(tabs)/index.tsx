@@ -1,16 +1,19 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback } from "react"
 import {
   View,
   Text,
   TextInput,
   ScrollView,
   Pressable,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
   StyleSheet,
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useVault } from "@/lib/vault-context"
-import { personalEntries, sharedEntries } from "@/lib/data"
-import type { VaultEntry } from "@/lib/types"
+import { useVaultEntries } from "@/lib/use-vault-entries"
+import type { VaultEntry, VaultType } from "@/lib/types"
 import { useTheme } from "@/lib/theme-context"
 import { withOpacity, radius, type ColorPalette } from "@/lib/theme"
 import { VaultEntryCard } from "@/components/vault-entry-card"
@@ -18,19 +21,41 @@ import { EntryDetail } from "@/components/entry-detail"
 
 type VaultTab = "all" | "personal" | "shared"
 
+const CATEGORIES = [
+  "Email", "Development", "Cloud", "Social", "Finance",
+  "Entertainment", "Network", "Shopping",
+]
+
 export default function VaultScreen() {
   const { colors } = useTheme()
   const styles = useMemo(() => createStyles(colors), [colors])
   const { sessionState } = useVault()
+  const {
+    entries, counts, loading,
+    addEntry, updateEntry, deleteEntry, toggleFavorite,
+  } = useVaultEntries()
   const [search, setSearch] = useState("")
   const [vaultTab, setVaultTab] = useState<VaultTab>("all")
   const [selectedEntry, setSelectedEntry] = useState<VaultEntry | null>(null)
+  const [showAddModal, setShowAddModal] = useState(false)
+
+  const handleSave = useCallback((updated: VaultEntry) => {
+    updateEntry(updated)
+    setSelectedEntry(updated)
+  }, [updateEntry])
+
+  const handleDelete = useCallback((id: string) => {
+    deleteEntry(id)
+    setSelectedEntry(null)
+  }, [deleteEntry])
 
   if (selectedEntry) {
     return (
       <EntryDetail
         entry={selectedEntry}
         onBack={() => setSelectedEntry(null)}
+        onSave={handleSave}
+        onDelete={handleDelete}
       />
     )
   }
@@ -39,20 +64,19 @@ export default function VaultScreen() {
     return <LockedOverlay />
   }
 
-  const allEntries = [...personalEntries, ...sharedEntries]
   const sourceEntries =
     vaultTab === "all"
-      ? allEntries
-      : vaultTab === "personal"
-        ? personalEntries
-        : sharedEntries
+      ? entries
+      : entries.filter((e) => e.vaultType === vaultTab)
 
-  const filteredEntries = sourceEntries.filter(
-    (entry) =>
-      entry.title.toLowerCase().includes(search.toLowerCase()) ||
-      entry.login.toLowerCase().includes(search.toLowerCase()) ||
-      entry.category.toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredEntries = search
+    ? sourceEntries.filter(
+        (entry) =>
+          entry.title.toLowerCase().includes(search.toLowerCase()) ||
+          entry.login.toLowerCase().includes(search.toLowerCase()) ||
+          entry.category.toLowerCase().includes(search.toLowerCase()),
+      )
+    : sourceEntries
 
   return (
     <View style={styles.container}>
@@ -62,15 +86,13 @@ export default function VaultScreen() {
           <View>
             <Text style={styles.headerTitle}>My Vault</Text>
             <Text style={styles.headerSub}>
-              {allEntries.length} entries across {personalEntries.length}{" "}
-              personal, {sharedEntries.length} shared
+              {counts.total} entries across {counts.personal} personal,{" "}
+              {counts.shared} shared
             </Text>
           </View>
           <Pressable
             style={styles.addBtn}
-            onPress={() => {
-              throw new Error("NOT_IMPLEMENTED: navigate to Add Entry screen (encrypt via CryptoBridge before saving)")
-            }}
+            onPress={() => setShowAddModal(true)}
           >
             <Ionicons name="add" size={14} color={colors.primaryForeground} />
             <Text style={styles.addBtnText}>Add</Text>
@@ -93,18 +115,6 @@ export default function VaultScreen() {
               style={styles.searchInput}
             />
           </View>
-          <Pressable
-            style={styles.filterBtn}
-            onPress={() => {
-              throw new Error("NOT_IMPLEMENTED: open filter/sort options (by category, date, favorites)")
-            }}
-          >
-            <Ionicons
-              name="options"
-              size={16}
-              color={colors.mutedForeground}
-            />
-          </Pressable>
         </View>
       </View>
 
@@ -135,15 +145,23 @@ export default function VaultScreen() {
         style={styles.list}
         contentContainerStyle={styles.listContent}
       >
-        {filteredEntries.length === 0 ? (
+        {loading ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>Loading...</Text>
+          </View>
+        ) : filteredEntries.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons
-              name="search"
+              name={search ? "search" : "add-circle-outline"}
               size={32}
               color={withOpacity(colors.mutedForeground, 0.4)}
             />
-            <Text style={styles.emptyTitle}>No entries found</Text>
-            <Text style={styles.emptySub}>Try a different search term</Text>
+            <Text style={styles.emptyTitle}>
+              {search ? "No entries found" : "Vault is empty"}
+            </Text>
+            <Text style={styles.emptySub}>
+              {search ? "Try a different search term" : "Tap + to add your first entry"}
+            </Text>
           </View>
         ) : (
           filteredEntries.map((entry) => (
@@ -155,7 +173,190 @@ export default function VaultScreen() {
           ))
         )}
       </ScrollView>
+
+      {/* Add Entry Modal */}
+      <AddEntryModal
+        visible={showAddModal}
+        colors={colors}
+        onClose={() => setShowAddModal(false)}
+        onAdd={(entry) => {
+          addEntry(entry)
+          setShowAddModal(false)
+        }}
+      />
     </View>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Add Entry Modal
+// ---------------------------------------------------------------------------
+
+function AddEntryModal({
+  visible,
+  colors,
+  onClose,
+  onAdd,
+}: {
+  visible: boolean
+  colors: ColorPalette
+  onClose: () => void
+  onAdd: (entry: Omit<VaultEntry, "id">) => void
+}) {
+  const styles = useMemo(() => createStyles(colors), [colors])
+  const [title, setTitle] = useState("")
+  const [url, setUrl] = useState("")
+  const [login, setLogin] = useState("")
+  const [password, setPassword] = useState("")
+  const [category, setCategory] = useState(CATEGORIES[0])
+  const [vaultType, setVaultType] = useState<VaultType>("personal")
+
+  const reset = () => {
+    setTitle(""); setUrl(""); setLogin(""); setPassword("")
+    setCategory(CATEGORIES[0]); setVaultType("personal")
+  }
+
+  const handleSubmit = () => {
+    if (!title.trim() || !login.trim() || !password.trim()) return
+    onAdd({
+      title: title.trim(),
+      url: url.trim(),
+      login: login.trim(),
+      password,
+      category,
+      vaultType,
+      favorite: false,
+      lastModified: new Date().toISOString().split("T")[0],
+    })
+    reset()
+  }
+
+  const handleClose = () => {
+    reset()
+    onClose()
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.modalOverlay}
+      >
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>New Entry</Text>
+            <Pressable onPress={handleClose}>
+              <Ionicons name="close" size={20} color={colors.mutedForeground} />
+            </Pressable>
+          </View>
+
+          <ScrollView style={styles.modalScroll}>
+            <Text style={styles.inputLabel}>TITLE *</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="e.g. Gmail, GitHub..."
+              placeholderTextColor={colors.mutedForeground}
+              value={title}
+              onChangeText={setTitle}
+            />
+
+            <Text style={styles.inputLabel}>URL</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="https://..."
+              placeholderTextColor={colors.mutedForeground}
+              value={url}
+              onChangeText={setUrl}
+              autoCapitalize="none"
+              keyboardType="url"
+            />
+
+            <Text style={styles.inputLabel}>LOGIN *</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="username or email"
+              placeholderTextColor={colors.mutedForeground}
+              value={login}
+              onChangeText={setLogin}
+              autoCapitalize="none"
+            />
+
+            <Text style={styles.inputLabel}>PASSWORD *</Text>
+            <TextInput
+              style={[styles.modalInput, { fontFamily: "monospace" }]}
+              placeholder="password"
+              placeholderTextColor={colors.mutedForeground}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+
+            <Text style={styles.inputLabel}>CATEGORY</Text>
+            <View style={styles.categoryRow}>
+              {CATEGORIES.map((cat) => (
+                <Pressable
+                  key={cat}
+                  onPress={() => setCategory(cat)}
+                  style={[
+                    styles.categoryChip,
+                    category === cat && styles.categoryChipActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.categoryChipText,
+                      category === cat && styles.categoryChipTextActive,
+                    ]}
+                  >
+                    {cat}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.inputLabel}>VAULT</Text>
+            <View style={styles.vaultTypeRow}>
+              {(["personal", "shared"] as VaultType[]).map((vt) => (
+                <Pressable
+                  key={vt}
+                  onPress={() => setVaultType(vt)}
+                  style={[
+                    styles.vaultTypeBtn,
+                    vaultType === vt && styles.vaultTypeBtnActive,
+                  ]}
+                >
+                  <Ionicons
+                    name={vt === "personal" ? "person" : "people"}
+                    size={14}
+                    color={vaultType === vt ? colors.primaryForeground : colors.mutedForeground}
+                  />
+                  <Text
+                    style={[
+                      styles.vaultTypeBtnText,
+                      vaultType === vt && styles.vaultTypeBtnTextActive,
+                    ]}
+                  >
+                    {vt.charAt(0).toUpperCase() + vt.slice(1)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </ScrollView>
+
+          <Pressable
+            style={[
+              styles.submitBtn,
+              (!title.trim() || !login.trim() || !password.trim()) && styles.submitBtnDisabled,
+            ]}
+            onPress={handleSubmit}
+            disabled={!title.trim() || !login.trim() || !password.trim()}
+          >
+            <Ionicons name="shield-checkmark" size={16} color={colors.primaryForeground} />
+            <Text style={styles.submitBtnText}>Encrypt & Save</Text>
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   )
 }
 
@@ -331,5 +532,124 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     color: withOpacity(colors.mutedForeground, 0.6),
     fontFamily: "monospace",
     marginTop: 16,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: withOpacity(colors.background, 0.85),
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    maxHeight: "90%",
+    paddingBottom: 24,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.foreground,
+  },
+  modalScroll: {
+    paddingHorizontal: 20,
+  },
+  inputLabel: {
+    fontSize: 10,
+    color: colors.mutedForeground,
+    letterSpacing: 1,
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  modalInput: {
+    height: 40,
+    fontSize: 14,
+    color: colors.foreground,
+    backgroundColor: colors.secondary,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 12,
+  },
+  categoryRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  categoryChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.secondary,
+  },
+  categoryChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  categoryChipText: {
+    fontSize: 11,
+    color: colors.mutedForeground,
+  },
+  categoryChipTextActive: {
+    color: colors.primaryForeground,
+  },
+  vaultTypeRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  vaultTypeBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    height: 36,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.secondary,
+  },
+  vaultTypeBtnActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  vaultTypeBtnText: {
+    fontSize: 12,
+    color: colors.mutedForeground,
+    fontWeight: "500",
+  },
+  vaultTypeBtnTextActive: {
+    color: colors.primaryForeground,
+  },
+  submitBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    height: 44,
+    marginHorizontal: 20,
+    marginTop: 16,
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+  },
+  submitBtnDisabled: {
+    opacity: 0.4,
+  },
+  submitBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.primaryForeground,
   },
 })

@@ -17,7 +17,7 @@
         "backgroundColor": "#1A1F2E",
         "foregroundImage": "./assets/vault-family-icons/ic_launcher_512x512.png"
       },
-"package": "com.avdienkosa.vaultfamilyui"
+      "package": "com.avdienkosa.vaultfamilyui"
     },
     "web": {
       "output": "static",
@@ -36,7 +36,8 @@
             "backgroundColor": "#111827"
           }
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true

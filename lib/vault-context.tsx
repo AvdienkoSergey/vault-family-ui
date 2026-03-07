@@ -11,15 +11,18 @@ import {
   createMasterKey,
   hasMasterKey,
   verifyAndDeriveKey,
+  migrateToV2,
 } from "./master-key";
 import {
   hasStoredCredentials,
-  retrieveCredentials,
   storeCredentials,
+  storeVaultKey,
+  retrieveVaultKey,
 } from "./security-service";
 import { ensureUserDir } from "./storage";
+import { openVaultDb, closeVaultDb, reEncryptAllEntries } from "./vault-db";
 import type { Email, Password, SessionState, UserProfile } from "./types";
-import { parseEmail, parsePassword } from "./types";
+import { parseEmail } from "./types";
 
 interface VaultContextType {
   currentUser: UserProfile | null;
@@ -67,21 +70,34 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   const [currentEmail, setCurrentEmail] = useState<Email | null>(null);
   const [encryptionKey, setEncryptionKey] = useState<string | null>(null);
   const [pendingBiometricEnroll, setPendingBiometricEnroll] = useState(false);
-  const pendingCredsRef = useRef<{ email: Email; password: Password } | null>(
+  const pendingCredsRef = useRef<{ email: Email; password: Password; vaultKey: string } | null>(
     null
   );
 
   const unlock = useCallback(
     async (email: Email, password: Password): Promise<{ error?: string }> => {
       const exists = await hasMasterKey(email);
+      let vaultKey: string;
       if (exists) {
-        const key = await verifyAndDeriveKey(email, password);
-        if (!key) return { error: "Incorrect master password" };
-        setEncryptionKey(key);
+        const result = await verifyAndDeriveKey(email, password);
+        if (!result) return { error: "Incorrect master password" };
+
+        openVaultDb(email);
+
+        if (result.needsMigration && result.oldEntryKey) {
+          // v1 -> v2: generate vault_key, re-encrypt all entries
+          const newVaultKey = await migrateToV2(email, password);
+          reEncryptAllEntries(result.oldEntryKey, newVaultKey);
+          vaultKey = newVaultKey;
+        } else {
+          vaultKey = result.vaultKey;
+        }
       } else {
-        const key = await createMasterKey(email, password);
-        setEncryptionKey(key);
+        vaultKey = await createMasterKey(email, password);
+        openVaultDb(email);
       }
+
+      setEncryptionKey(vaultKey);
 
       await activateSession(
         email,
@@ -94,11 +110,12 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       // Only offer biometric enrollment if not already enrolled
       const alreadyEnrolled = await hasStoredCredentials();
       if (!alreadyEnrolled) {
-        pendingCredsRef.current = { email, password };
+        pendingCredsRef.current = { email, password, vaultKey };
         setPendingBiometricEnroll(true);
       } else {
-        // Update stored credentials with the current password
+        // Update stored credentials + vault key for biometric fast-path
         storeCredentials(email, password).catch(() => {});
+        storeVaultKey(email, vaultKey).catch(() => {});
       }
       return {};
     },
@@ -107,28 +124,24 @@ export function VaultProvider({ children }: { children: ReactNode }) {
 
   const completeBiometricEnroll = useCallback((accepted: boolean) => {
     if (accepted && pendingCredsRef.current) {
-      const { email, password } = pendingCredsRef.current;
+      const { email, password, vaultKey } = pendingCredsRef.current;
       storeCredentials(email, password).catch(() => {});
+      storeVaultKey(email, vaultKey).catch(() => {});
     }
     pendingCredsRef.current = null;
     setPendingBiometricEnroll(false);
   }, []);
 
   const unlockWithBiometrics = useCallback(async (): Promise<boolean> => {
-    const creds = await retrieveCredentials();
-    if (!creds) return false;
+    // Fast path: retrieve vaultKey directly from keychain (no PBKDF2)
+    const stored = await retrieveVaultKey();
+    if (!stored) return false;
 
-    const emailResult = parseEmail(creds.email);
-    const passwordResult = parsePassword(creds.password);
-    if (!emailResult.ok || !passwordResult.ok) return false;
+    const emailResult = parseEmail(stored.email as Email);
+    if (!emailResult.ok) return false;
 
-    const key = await verifyAndDeriveKey(
-      emailResult.value,
-      passwordResult.value
-    );
-    if (!key) return false;
-
-    setEncryptionKey(key);
+    openVaultDb(emailResult.value);
+    setEncryptionKey(stored.vaultKey);
     await activateSession(
       emailResult.value,
       setCurrentUser,
@@ -159,6 +172,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   );
 
   const lock = useCallback(() => {
+    closeVaultDb();
     setCurrentUser(null);
     setCurrentEmail(null);
     setUserDir(null);

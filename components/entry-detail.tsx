@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react"
-import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from "react-native"
+import { View, Text, Pressable, TextInput, ScrollView, Alert, StyleSheet } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import type { VaultEntry } from "@/lib/types"
 import { useTheme } from "@/lib/theme-context"
@@ -9,12 +9,18 @@ import { copyToClipboard } from "@/lib/clipboard"
 interface EntryDetailProps {
   entry: VaultEntry
   onBack: () => void
+  onSave: (updated: VaultEntry) => void
+  onDelete: (id: string) => void
 }
 
-export function EntryDetail({ entry, onBack }: EntryDetailProps) {
+export function EntryDetail({ entry, onBack, onSave, onDelete }: EntryDetailProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
+  const [editTitle, setEditTitle] = useState(entry.title)
+  const [editUrl, setEditUrl] = useState(entry.url)
+  const [editLogin, setEditLogin] = useState(entry.login)
+  const [editPassword, setEditPassword] = useState(entry.password)
   const { colors } = useTheme()
   const styles = useMemo(() => createStyles(colors), [colors])
   const isShared = entry.vaultType === "shared"
@@ -23,6 +29,29 @@ export function EntryDetail({ entry, onBack }: EntryDetailProps) {
     copyToClipboard(text)
     setCopiedField(field)
     setTimeout(() => setCopiedField(null), 1500)
+  }
+
+  const handleSave = () => {
+    onSave({
+      ...entry,
+      title: editTitle,
+      url: editUrl,
+      login: editLogin,
+      password: editPassword,
+      lastModified: new Date().toISOString().split("T")[0],
+    })
+    setIsEditing(false)
+  }
+
+  const handleDelete = () => {
+    Alert.alert(
+      "Delete Entry",
+      `Are you sure you want to delete "${entry.title}"? This action cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: () => { onDelete(entry.id); onBack() } },
+      ],
+    )
   }
 
   return (
@@ -72,7 +101,7 @@ export function EntryDetail({ entry, onBack }: EntryDetailProps) {
       {/* Action buttons */}
       <View style={styles.actionRow}>
         <Pressable
-          onPress={() => setIsEditing(!isEditing)}
+          onPress={() => isEditing ? handleSave() : setIsEditing(true)}
           style={[styles.actionBtn, isEditing && styles.actionBtnActive]}
         >
           <Ionicons
@@ -92,9 +121,7 @@ export function EntryDetail({ entry, onBack }: EntryDetailProps) {
 
         <Pressable
           style={styles.deleteBtn}
-          onPress={() => {
-            throw new Error("NOT_IMPLEMENTED: confirm deletion and remove entry from vault.db via CryptoBridge")
-          }}
+          onPress={handleDelete}
         >
           <Ionicons name="trash-outline" size={14} color={colors.destructive} />
           <Text style={styles.deleteBtnText}>Delete</Text>
@@ -107,8 +134,9 @@ export function EntryDetail({ entry, onBack }: EntryDetailProps) {
           colors={colors}
           styles={styles}
           label="Title"
-          value={entry.title}
+          value={isEditing ? editTitle : entry.title}
           editing={isEditing}
+          onChangeText={setEditTitle}
           onCopy={() => handleCopy(entry.title, "title")}
           copied={copiedField === "title"}
         />
@@ -117,8 +145,9 @@ export function EntryDetail({ entry, onBack }: EntryDetailProps) {
           colors={colors}
           styles={styles}
           label="URL"
-          value={entry.url}
+          value={isEditing ? editUrl : entry.url}
           editing={isEditing}
+          onChangeText={setEditUrl}
           onCopy={() => handleCopy(entry.url, "url")}
           copied={copiedField === "url"}
           isUrl
@@ -128,8 +157,9 @@ export function EntryDetail({ entry, onBack }: EntryDetailProps) {
           colors={colors}
           styles={styles}
           label="Login"
-          value={entry.login}
+          value={isEditing ? editLogin : entry.login}
           editing={isEditing}
+          onChangeText={setEditLogin}
           onCopy={() => handleCopy(entry.login, "login")}
           copied={copiedField === "login"}
         />
@@ -141,7 +171,8 @@ export function EntryDetail({ entry, onBack }: EntryDetailProps) {
             <Text style={styles.fieldLabel}>PASSWORD</Text>
             {isEditing ? (
               <TextInput
-                defaultValue={entry.password}
+                value={editPassword}
+                onChangeText={setEditPassword}
                 style={[styles.fieldInput, { fontFamily: "monospace" }]}
                 placeholderTextColor={colors.mutedForeground}
               />
@@ -204,6 +235,7 @@ function FieldRow({
   label,
   value,
   editing,
+  onChangeText,
   onCopy,
   copied,
   isUrl,
@@ -213,6 +245,7 @@ function FieldRow({
   label: string
   value: string
   editing: boolean
+  onChangeText?: (text: string) => void
   onCopy: () => void
   copied: boolean
   isUrl?: boolean
@@ -223,7 +256,8 @@ function FieldRow({
         <Text style={styles.fieldLabel}>{label.toUpperCase()}</Text>
         {editing ? (
           <TextInput
-            defaultValue={value}
+            value={value}
+            onChangeText={onChangeText}
             style={styles.fieldInput}
             placeholderTextColor={colors.mutedForeground}
           />
