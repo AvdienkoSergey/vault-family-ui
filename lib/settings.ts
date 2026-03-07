@@ -8,6 +8,7 @@ export interface AppSettings {
   biometricEnabled: boolean
   zeroizeOnClose: boolean
   autoLockTimeout: number // minutes
+  categories: string[]
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -15,6 +16,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   biometricEnabled: true,
   zeroizeOnClose: true,
   autoLockTimeout: 5,
+  categories: [],
 }
 
 const USERS_ROOT = `${FileSystem.documentDirectory}users/`

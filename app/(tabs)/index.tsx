@@ -15,21 +15,18 @@ import { useVault } from "@/lib/vault-context"
 import { useVaultEntries } from "@/lib/use-vault-entries"
 import type { VaultEntry, VaultType } from "@/lib/types"
 import { useTheme } from "@/lib/theme-context"
+import { useSettings } from "@/lib/settings-context"
 import { withOpacity, radius, type ColorPalette } from "@/lib/theme"
 import { VaultEntryCard } from "@/components/vault-entry-card"
 import { EntryDetail } from "@/components/entry-detail"
 
 type VaultTab = "all" | "personal" | "shared"
 
-const CATEGORIES = [
-  "Email", "Development", "Cloud", "Social", "Finance",
-  "Entertainment", "Network", "Shopping",
-]
-
 export default function VaultScreen() {
   const { colors } = useTheme()
   const styles = useMemo(() => createStyles(colors), [colors])
   const { sessionState } = useVault()
+  const { settings } = useSettings()
   const {
     entries, counts, loading,
     addEntry, updateEntry, deleteEntry, toggleFavorite,
@@ -38,6 +35,9 @@ export default function VaultScreen() {
   const [vaultTab, setVaultTab] = useState<VaultTab>("all")
   const [selectedEntry, setSelectedEntry] = useState<VaultEntry | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [filterCategory, setFilterCategory] = useState<string | null>(null)
+
+  const categories = settings.categories
 
   const handleSave = useCallback((updated: VaultEntry) => {
     updateEntry(updated)
@@ -69,14 +69,18 @@ export default function VaultScreen() {
       ? entries
       : entries.filter((e) => e.vaultType === vaultTab)
 
-  const filteredEntries = search
-    ? sourceEntries.filter(
-        (entry) =>
-          entry.title.toLowerCase().includes(search.toLowerCase()) ||
-          entry.login.toLowerCase().includes(search.toLowerCase()) ||
-          entry.category.toLowerCase().includes(search.toLowerCase()),
+  const filteredEntries = sourceEntries.filter((entry) => {
+    if (filterCategory && entry.category !== filterCategory) return false
+    if (search) {
+      const q = search.toLowerCase()
+      return (
+        entry.title.toLowerCase().includes(q) ||
+        entry.login.toLowerCase().includes(q) ||
+        entry.category.toLowerCase().includes(q)
       )
-    : sourceEntries
+    }
+    return true
+  })
 
   return (
     <View style={styles.container}>
@@ -115,7 +119,34 @@ export default function VaultScreen() {
               style={styles.searchInput}
             />
           </View>
+          {categories.length > 0 && (
+            <Pressable
+              style={[styles.filterBtn, filterCategory && styles.filterBtnActive]}
+              onPress={() => setFilterCategory(filterCategory ? null : categories[0])}
+            >
+              <Ionicons
+                name="funnel"
+                size={16}
+                color={filterCategory ? colors.primaryForeground : colors.mutedForeground}
+              />
+            </Pressable>
+          )}
         </View>
+        {filterCategory && categories.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChipsRow}>
+            {categories.map((cat) => (
+              <Pressable
+                key={cat}
+                onPress={() => setFilterCategory(filterCategory === cat ? null : cat)}
+                style={[styles.filterChip, filterCategory === cat && styles.filterChipActive]}
+              >
+                <Text style={[styles.filterChipText, filterCategory === cat && styles.filterChipTextActive]}>
+                  {cat}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
       </View>
 
       {/* Tabs */}
@@ -178,6 +209,7 @@ export default function VaultScreen() {
       <AddEntryModal
         visible={showAddModal}
         colors={colors}
+        categories={categories}
         onClose={() => setShowAddModal(false)}
         onAdd={(entry) => {
           addEntry(entry)
@@ -195,11 +227,13 @@ export default function VaultScreen() {
 function AddEntryModal({
   visible,
   colors,
+  categories,
   onClose,
   onAdd,
 }: {
   visible: boolean
   colors: ColorPalette
+  categories: string[]
   onClose: () => void
   onAdd: (entry: Omit<VaultEntry, "id">) => void
 }) {
@@ -208,12 +242,12 @@ function AddEntryModal({
   const [url, setUrl] = useState("")
   const [login, setLogin] = useState("")
   const [password, setPassword] = useState("")
-  const [category, setCategory] = useState(CATEGORIES[0])
+  const [category, setCategory] = useState(categories[0] ?? "")
   const [vaultType, setVaultType] = useState<VaultType>("personal")
 
   const reset = () => {
     setTitle(""); setUrl(""); setLogin(""); setPassword("")
-    setCategory(CATEGORIES[0]); setVaultType("personal")
+    setCategory(categories[0] ?? ""); setVaultType("personal")
   }
 
   const handleSubmit = () => {
@@ -291,9 +325,11 @@ function AddEntryModal({
               secureTextEntry
             />
 
-            <Text style={styles.inputLabel}>CATEGORY</Text>
+            {categories.length > 0 && (
+              <Text style={styles.inputLabel}>CATEGORY</Text>
+            )}
             <View style={styles.categoryRow}>
-              {CATEGORIES.map((cat) => (
+              {categories.map((cat) => (
                 <Pressable
                   key={cat}
                   onPress={() => setCategory(cat)}
@@ -449,6 +485,34 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
+  },
+  filterBtnActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  filterChipsRow: {
+    marginTop: 6,
+    flexGrow: 0,
+  },
+  filterChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.secondary,
+    marginRight: 6,
+  },
+  filterChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  filterChipText: {
+    fontSize: 11,
+    color: colors.mutedForeground,
+  },
+  filterChipTextActive: {
+    color: colors.primaryForeground,
   },
   tabs: {
     paddingHorizontal: 16,
