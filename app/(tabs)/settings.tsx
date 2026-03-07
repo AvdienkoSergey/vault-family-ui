@@ -85,29 +85,36 @@ export default function SettingsScreen() {
           <View style={styles.profileAvatar}>
             <Text style={styles.profileAvatarText}>{currentUser.avatar}</Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <View style={styles.profileNameRow}>
-              <Text style={styles.profileName}>{currentUser.name}</Text>
-              <View style={styles.ownerBadge}>
-                <Text style={styles.ownerBadgeText}>Owner</Text>
-              </View>
-            </View>
-            <Text style={styles.profileSub}>Vault Family Owner</Text>
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName} numberOfLines={1}>{currentUser.name}</Text>
+            <Pressable
+              style={styles.profileActionBtn}
+              onPress={() => lock()}
+            >
+              <Text style={styles.signOutText}>Sign Out</Text>
+            </Pressable>
           </View>
           <View style={styles.profileActions}>
             <Pressable
-              style={styles.profileActionBtnDanger}
+              style={styles.profileSyncBtn}
+              onPress={() => {
+                setTransferCode("")
+                setTransferCopies(1)
+                setTransferError("")
+                setTransferStep("config")
+                setTransferPassword("")
+                setShowTransferModal(true)
+              }}
+            >
+              <Ionicons name="sync" size={14} color="#fff" />
+              <Text style={styles.profileSyncText}>Sync</Text>
+            </Pressable>
+            <Pressable
+              style={styles.profileDeleteBtn}
               onPress={() => setShowDeleteModal(true)}
             >
               <Ionicons name="trash" size={14} color={colors.destructive} />
-            </Pressable>
-            <Pressable
-              style={styles.profileActionBtn}
-              onPress={() => {
-                lock()
-              }}
-            >
-              <Text style={styles.signOutText}>Sign Out</Text>
+              <Text style={styles.profileDeleteText}>Delete</Text>
             </Pressable>
           </View>
         </View>
@@ -186,23 +193,6 @@ export default function SettingsScreen() {
             setCpConfirmPw("")
             setCpError("")
             setShowChangePwModal(true)
-          }}
-        />
-        <View style={styles.divider} />
-        <SettingRow
-          colors={colors}
-          styles={styles}
-          icon={<Ionicons name="cloud-upload" size={16} color={colors.mutedForeground} />}
-          label="Transfer to Device"
-          description="Encrypted backup via one-time code"
-          chevron
-          onPress={() => {
-            setTransferCode("")
-            setTransferCopies(1)
-            setTransferError("")
-            setTransferStep("config")
-            setTransferPassword("")
-            setShowTransferModal(true)
           }}
         />
       </View>
@@ -680,30 +670,15 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     fontWeight: "700",
     color: colors.primary,
   },
-  profileNameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+  profileInfo: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
   },
   profileName: {
     fontSize: 14,
     fontWeight: "600",
     color: colors.foreground,
-  },
-  ownerBadge: {
-    backgroundColor: withOpacity(colors.primary, 0.15),
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  ownerBadgeText: {
-    fontSize: 10,
-    color: colors.primary,
-  },
-  profileSub: {
-    fontSize: 12,
-    color: colors.mutedForeground,
-    marginTop: 2,
   },
   settingRow: {
     flexDirection: "row",
@@ -750,29 +725,51 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     color: colors.secondaryForeground,
   },
   profileActions: {
-    flexDirection: "row",
-    gap: 8,
+    gap: 6,
   },
   profileActionBtn: {
-    height: 32,
-    paddingHorizontal: 12,
+    height: 28,
+    paddingHorizontal: 10,
     borderRadius: radius.md,
     backgroundColor: colors.secondary,
     alignItems: "center",
     justifyContent: "center",
+    alignSelf: "flex-start",
   },
   signOutText: {
     fontSize: 11,
     fontWeight: "500",
     color: colors.mutedForeground,
   },
-  profileActionBtnDanger: {
-    width: 32,
+  profileSyncBtn: {
     height: 32,
+    paddingHorizontal: 12,
     borderRadius: radius.md,
-    backgroundColor: withOpacity(colors.destructive, 0.1),
+    backgroundColor: "#22c55e",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 6,
+  },
+  profileSyncText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  profileDeleteBtn: {
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: radius.md,
+    backgroundColor: withOpacity(colors.destructive, 0.1),
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  profileDeleteText: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: colors.destructive,
   },
   storageTitleRow: {
     flexDirection: "row",
