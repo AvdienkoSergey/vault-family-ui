@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.1](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.3.0...v1.3.1) (2026-03-07)
+
+
+### Bug Fixes
+
+* **ci:** switch from npm to yarn in release workflows ([4964003](https://github.com/AvdienkoSergey/vault-family-ui/commit/496400383a9c1126ce0c86933f6542f5d0de32a5))
+* **ci:** switch from npm to yarn in release workflows ([bc6a7db](https://github.com/AvdienkoSergey/vault-family-ui/commit/bc6a7db0880d27e673409ba0d508179fcbb09b57))
+
 ## [1.3.0](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.2.1...v1.3.0) (2026-03-07)
 
 
