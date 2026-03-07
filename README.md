@@ -1,50 +1,110 @@
-# Welcome to your Expo app 👋
+# Vault Family — E2E-зашифрованный семейный менеджер паролей
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+React Native (Expo) приложение с Rust/WASM криптографическим ядром.
 
-## Get started
+## Архитектура
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+app/                    # Экраны (file-based routing)
+├── unlock.tsx          # Экран разблокировки / создания хранилища
+├── (tabs)/
+│   ├── index.tsx       # Хранилище записей
+│   ├── family.tsx      # Управление семьёй (shared vaults)
+│   ├── generator.tsx   # Генератор паролей
+│   └── settings.tsx    # Настройки
+components/             # UI-компоненты
+├── vault-entry-card.tsx
+├── entry-detail.tsx
+└── session-bar.tsx
+lib/                    # Бизнес-логика
+├── crypto-wasm/        # Rust WASM-модуль (скомпилированный)
+├── wasm-bridge.ts      # Мост к WASM: инициализация + API
+├── master-key.ts       # Хеширование и верификация мастер-пароля
+├── vault-context.tsx   # Состояние сессии + ключ шифрования
+├── security-service.ts # Keychain + биометрия
+├── storage.ts          # Файловая система (директории пользователей)
+├── settings.ts         # Настройки (theme, biometric, auto-lock)
+├── settings-context.tsx
+├── theme-context.tsx
+├── theme.ts
+├── types.ts            # Брендированные типы, валидация
+└── data.ts             # Мок-данные
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Криптография (WASM)
 
-## Learn more
+Rust-модуль `vault-crypto-wasm` обеспечивает серверную совместимость:
 
-To learn more about developing your project with Expo, look at the following resources:
+- **PBKDF2-HMAC-SHA256** (600 000 итераций) — хеширование мастер-пароля
+- **AES-256-GCM** — шифрование записей и сырых данных
+- **X25519 Diffie-Hellman** — обмен ключами для shared vaults
+- **zeroize** — зануление промежуточных буферов в WASM-памяти
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Крейты: `aes-gcm 0.10.3`, `pbkdf2 0.12.2`, `x25519-dalek 2.0.1`
 
-## Join the community
+## Поток аутентификации
 
-Join our community of developers creating universal apps.
+1. **Создание хранилища** — `hashMasterPassword` создаёт PHC-хеш, `generateEncryptionSalt` + `deriveEncryptionKey` порождают ключ шифрования. Всё сохраняется в `master.key`.
+2. **Вход по паролю** — `verifyMasterPassword` проверяет пароль, `deriveEncryptionKey` восстанавливает ключ в память.
+3. **Биометрия** — email + пароль хранятся в Keychain (`react-native-keychain`) с защитой `BIOMETRY_CURRENT_SET`. При разблокировке — автоматическая верификация + деривация ключа.
+4. **Блокировка** — ключ шифрования обнуляется в памяти.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Структура данных
+
+```
+{documentDirectory}/users/
+└── user@example.com/
+    ├── master.key       # { hash (PHC), encryption_salt (hex) }
+    └── settings.json    # { theme, biometricEnabled, autoLockTimeout, ... }
+```
+
+## Роли
+
+| Роль     | Доступ                                     |
+|----------|--------------------------------------------|
+| owner    | Полный: управление семьёй, invite, revoke  |
+| editor   | Чтение и запись записей                    |
+| viewer   | Только чтение (UI блокирует edit/delete)   |
+
+## Запуск
+
+1. Установка зависимостей:
+
+   ```bash
+   yarn install
+   ```
+
+2. Запуск dev-сервера:
+
+   ```bash
+   yarn start
+   ```
+
+3. Сборка Android APK:
+
+   ```bash
+   yarn build:android
+   ```
+
+## Реализованное
+
+- Экран разблокировки с переключением режимов (создание / вход)
+- Верификация мастер-пароля через WASM (PBKDF2 600K итераций)
+- Деривация ключа шифрования (AES-256) при каждом входе
+- Биометрическая разблокировка (Keychain + FaceID/TouchID)
+- Модалка подключения биометрии с явными кнопками (не закрывается тапом за пределы)
+- Многопользовательская поддержка (выбор аккаунта чипами)
+- Предзагрузка темы до разблокировки (без мерцания)
+- Splash screen без чёрного экрана при переходе
+- Удаление аккаунта с очисткой директории
+- Генератор паролей (UI готов, WASM CSPRNG доступен)
+- Полный WASM-мост ко всем 13 крипто-функциям модуля
+
+## TODO
+
+- Шифрование/расшифровка записей (encrypt/decrypt через `encryptionKey`)
+- Подключение WASM `generatePassword` к генератору (замена `Math.random`)
+- Синхронизация с бэкендом (Axum API)
+- X25519 обмен ключами для shared vaults
+- Auto-lock по таймауту
+- Clipboard с авто-очисткой
