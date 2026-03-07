@@ -6,6 +6,7 @@ import React, { useEffect } from "react"
 import { VaultProvider, useVault } from "@/lib/vault-context"
 import { SettingsProvider } from "@/lib/settings-context"
 import { ThemeProvider, useTheme } from "@/lib/theme-context"
+import { useAutoLock } from "@/lib/use-auto-lock"
 
 // Keep splash visible until app signals it's ready
 SplashScreen.preventAutoHideAsync()
@@ -17,6 +18,8 @@ function AppStack() {
   const { sessionState } = useVault()
   const router = useRouter()
   const segments = useSegments()
+
+  useAutoLock()
 
   useEffect(() => {
     const inTabs = segments[0] === "(tabs)"
