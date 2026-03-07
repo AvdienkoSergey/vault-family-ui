@@ -17,7 +17,7 @@ import { useTheme } from "@/lib/theme-context"
 import { useSettings } from "@/lib/settings-context"
 import { withOpacity, radius, type ColorPalette } from "@/lib/theme"
 import { parseEmail, parsePassword } from "@/lib/types"
-import { listUsers } from "@/lib/storage"
+import { listUsers, deleteAllUsers } from "@/lib/storage"
 import { hasStoredCredentials, isBiometricsAvailable } from "@/lib/security-service"
 
 type Mode = "loading" | "create" | "signin"
@@ -273,6 +273,25 @@ export default function UnlockScreen() {
               {isCreate ? "Already have a vault? Sign in" : "Create new vault"}
             </Text>
           </Pressable>
+          {knownUsers.length > 0 && (
+            <Pressable
+              style={styles.footerBtn}
+              onPress={async () => {
+                await deleteAllUsers()
+                setKnownUsers([])
+                setEmail("")
+                setPassword("")
+                setConfirmPassword("")
+                setMode("create")
+                setError("")
+              }}
+            >
+              <Ionicons name="trash-outline" size={14} color={colors.destructive} />
+              <Text style={[styles.switchText, { color: colors.destructive }]}>
+                Reset all vaults
+              </Text>
+            </Pressable>
+          )}
         </View>
       </View>
 
