@@ -92,22 +92,10 @@ export function VaultEntryCard({ entry, onSelect }: VaultEntryCardProps) {
           />
         </Pressable>
         <Pressable
-          onPress={() => handleCopy(entry.password, "password")}
-          style={[
-            styles.copyBtn,
-            copiedField === "password" && {
-              backgroundColor: withOpacity(colors.success, 0.2),
-            },
-          ]}
+          onPress={() => onSelect(entry)}
+          style={styles.openBtn}
         >
-          <Text
-            style={[
-              styles.copyPassText,
-              copiedField === "password" && { color: colors.success },
-            ]}
-          >
-            ***
-          </Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
         </Pressable>
       </View>
     </Pressable>
@@ -207,9 +195,11 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  copyPassText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.mutedForeground,
+  openBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.sm,
+    alignItems: "center",
+    justifyContent: "center",
   },
 })
