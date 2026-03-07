@@ -93,21 +93,40 @@ jobs:
           xcodebuild -workspace ios/*.xcworkspace -list 2>/dev/null || true
           echo ""
           ALL_SCHEMES=$(xcodebuild -workspace ios/*.xcworkspace -list 2>/dev/null | sed -n '/Schemes:/,/^$/{ /Schemes:/d; /^$/d; s/^[[:space:]]*//; p; }')
-          echo "Parsed schemes: $ALL_SCHEMES"
-          # Prefer the app scheme (not Pods-*), pick first non-Pods scheme
-          SCHEME=$(echo "$ALL_SCHEMES" | grep -v "^Pods" | head -1)
+          echo "Parsed schemes:"
+          echo "$ALL_SCHEMES" | cat -A
+          # Prefer the app scheme (not Pods-*), pick first non-Pods non-empty scheme
+          SCHEME=$(echo "$ALL_SCHEMES" | grep -v "^Pods" | grep -v "^$" | head -1)
           if [ -z "$SCHEME" ]; then
-            SCHEME=$(echo "$ALL_SCHEMES" | head -1)
+            SCHEME=$(echo "$ALL_SCHEMES" | grep -v "^$" | head -1)
           fi
-          echo "Selected scheme: $SCHEME"
+          # Fallback: derive from xcworkspace filename
+          if [ -z "$SCHEME" ]; then
+            SCHEME=$(basename ios/*.xcworkspace .xcworkspace)
+            echo "WARNING: No scheme from xcodebuild -list, falling back to workspace name: $SCHEME"
+          fi
+          echo "Selected scheme: '$SCHEME'"
           echo "name=$SCHEME" >> "$GITHUB_OUTPUT"
+
+      - name: Verify scheme builds app target
+        run: |
+          SCHEME="${{ steps.scheme.outputs.name }}"
+          echo "Verifying scheme '$SCHEME' contains app target..."
+          xcodebuild -workspace ios/*.xcworkspace \
+            -scheme "$SCHEME" \
+            -showBuildSettings 2>/dev/null | grep -E "PRODUCT_TYPE|PRODUCT_NAME|FULL_PRODUCT_NAME" | head -10 || true
 
       - name: Build iOS Simulator (Release)
         run: |
           set -eo pipefail
-          echo "Building scheme: ${{ steps.scheme.outputs.name }}"
+          SCHEME="${{ steps.scheme.outputs.name }}"
+          if [ -z "$SCHEME" ]; then
+            echo "ERROR: No scheme resolved. Cannot build."
+            exit 1
+          fi
+          echo "Building scheme: '$SCHEME'"
           xcodebuild -workspace ios/*.xcworkspace \
-            -scheme "${{ steps.scheme.outputs.name }}" \
+            -scheme "$SCHEME" \
             -configuration Release \
             -sdk iphonesimulator \
             -derivedDataPath $RUNNER_TEMP/build \
