@@ -74,27 +74,23 @@ export default function SettingsScreen() {
       style={styles.container}
       contentContainerStyle={styles.content}
     >
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Settings</Text>
-        <Text style={styles.headerSub}>Security and vault configuration</Text>
-      </View>
-
-      {/* Toolbar: theme + language */}
-      <View style={styles.toolbarRow}>
-        <Pressable style={styles.toolbarBtn} onPress={toggleTheme}>
-          <Ionicons
-            name={colorScheme === "dark" ? "moon" : "sunny"}
-            size={16}
-            color={colors.foreground}
-          />
-          <Text style={styles.toolbarBtnText}>
-            {colorScheme === "dark" ? "Dark" : "Light"}
-          </Text>
-        </Pressable>
-        <Pressable style={styles.toolbarBtn} onPress={() => {}}>
-          <Ionicons name="language" size={16} color={colors.foreground} />
-          <Text style={styles.toolbarBtnText}>English</Text>
-        </Pressable>
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.headerTitle}>Settings</Text>
+          <Text style={styles.headerSub}>Security and vault configuration</Text>
+        </View>
+        <View style={styles.toolbarRow}>
+          <Pressable style={styles.toolbarBtn} onPress={toggleTheme}>
+            <Ionicons
+              name={colorScheme === "dark" ? "moon" : "sunny"}
+              size={14}
+              color={colors.foreground}
+            />
+          </Pressable>
+          <Pressable style={styles.toolbarBtn} onPress={() => {}}>
+            <Text style={styles.toolbarBtnText}>EN</Text>
+          </Pressable>
+        </View>
       </View>
 
       {/* Profile */}
@@ -602,7 +598,10 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     paddingBottom: 32,
     gap: 8,
   },
-  header: {
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 8,
   },
   headerTitle: {
@@ -618,23 +617,21 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
   toolbarRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 4,
+    gap: 6,
   },
   toolbarBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+    width: 32,
     height: 32,
-    paddingHorizontal: 12,
     borderRadius: radius.md,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
   toolbarBtnText: {
-    fontSize: 12,
-    fontWeight: "500",
+    fontSize: 10,
+    fontWeight: "600",
     color: colors.foreground,
   },
   sectionTitle: {
