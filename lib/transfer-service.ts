@@ -18,7 +18,14 @@ import { serializeArchive, deserializeArchive, type ArchiveBlob } from "./archiv
 const DEFAULT_BASE_URL = "https://vault-api.example.com"
 const TRANSFER_TTL_MINUTES = 10
 
+export interface TransferLimits {
+  maxDevices: number
+}
+
+const FREE_TIER: TransferLimits = { maxDevices: 2 }
+
 let baseUrl = DEFAULT_BASE_URL
+let limits: TransferLimits = FREE_TIER
 
 export function setTransferServer(url: string): void {
   baseUrl = url.replace(/\/+$/, "")
@@ -28,6 +35,14 @@ export function getTransferServer(): string {
   return baseUrl
 }
 
+export function setTransferLimits(newLimits: TransferLimits): void {
+  limits = newLimits
+}
+
+export function getTransferLimits(): TransferLimits {
+  return limits
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -35,10 +50,11 @@ export function getTransferServer(): string {
 interface TransferUploadResponse {
   code: string
   expires_at: string
+  copies: number
 }
 
 export type UploadResult =
-  | { ok: true; code: string; expiresAt: string; ttlMinutes: number }
+  | { ok: true; code: string; expiresAt: string; ttlMinutes: number; copies: number }
   | { ok: false; error: string }
 
 export type DownloadResult =
@@ -49,14 +65,23 @@ export type DownloadResult =
 // Upload (Device A)
 // ---------------------------------------------------------------------------
 
-export async function uploadArchive(archive: ArchiveBlob): Promise<UploadResult> {
+export async function uploadArchive(
+  archive: ArchiveBlob,
+  copies?: number,
+): Promise<UploadResult> {
+  const maxDevices = limits.maxDevices
+  const requestedCopies = Math.min(Math.max(copies ?? maxDevices, 1), maxDevices)
   const payload = serializeArchive(archive)
 
   try {
     const response = await fetch(`${baseUrl}/transfer`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ payload, ttl_minutes: TRANSFER_TTL_MINUTES }),
+      body: JSON.stringify({
+        payload,
+        ttl_minutes: TRANSFER_TTL_MINUTES,
+        copies: requestedCopies,
+      }),
     })
 
     if (!response.ok) {
@@ -70,6 +95,7 @@ export async function uploadArchive(archive: ArchiveBlob): Promise<UploadResult>
       code: data.code,
       expiresAt: data.expires_at,
       ttlMinutes: TRANSFER_TTL_MINUTES,
+      copies: data.copies,
     }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "NETWORK_ERROR" }
