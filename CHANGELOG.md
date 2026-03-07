@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.1](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.5.0...v1.5.1) (2026-03-07)
+
+
+### Bug Fixes
+
+* **ci:** improve iOS build diagnostics and scheme resolution ([f7afccb](https://github.com/AvdienkoSergey/vault-family-ui/commit/f7afccb33a1dd925b92f67033b71cb5e7b7091d5))
+* **ci:** improve iOS build diagnostics and scheme resolution ([50fa97d](https://github.com/AvdienkoSergey/vault-family-ui/commit/50fa97d2eb2163838bcf45e717a76f5a8df0efb4))
+
 ## [1.5.0](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.4.0...v1.5.0) (2026-03-07)
 
 
