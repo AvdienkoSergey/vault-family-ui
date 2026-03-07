@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.2.0...v1.2.1) (2026-03-07)
+
+
+### Bug Fixes
+
+* **deps:** sync lock files with react-native-keychain dependency ([56783fc](https://github.com/AvdienkoSergey/vault-family-ui/commit/56783fca6b46becdd9aa22ce656283d7d5778c6d))
+
 ## [1.2.0](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.1.1...v1.2.0) (2026-03-07)
 
 
