@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.0](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.3.2...v1.4.0) (2026-03-07)
+
+
+### Features
+
+* **storage:** add deleteUserDir, listUserFiles and async master-key ops ([ac4cecb](https://github.com/AvdienkoSergey/vault-family-ui/commit/ac4cecb5d0e7a51cec74b4ff339fc449dd8c66ec))
+* **test:** add Jest config and test infrastructure ([ace5c20](https://github.com/AvdienkoSergey/vault-family-ui/commit/ace5c2027af0663a8618e07997df0b0423b55f28))
+
+
+### Bug Fixes
+
+* **ci:** use find to locate .app bundle in iOS build output ([da567d4](https://github.com/AvdienkoSergey/vault-family-ui/commit/da567d43a5611ca29b56b461bc772094d1ad3762))
+
 ## [1.3.2](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.3.1...v1.3.2) (2026-03-07)
 
 
