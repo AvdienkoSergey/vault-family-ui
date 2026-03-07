@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native"
+import * as SplashScreen from "expo-splash-screen"
 import { Ionicons } from "@expo/vector-icons"
 import { useVault } from "@/lib/vault-context"
 import { useTheme } from "@/lib/theme-context"
@@ -81,7 +82,15 @@ export default function UnlockScreen() {
     ? email.includes("@") && password.length >= 8 && confirmPassword.length > 0
     : email.includes("@") && password.length >= 1
 
-  if (mode === "loading") return null
+  useEffect(() => {
+    if (mode !== "loading") {
+      SplashScreen.hideAsync()
+    }
+  }, [mode])
+
+  if (mode === "loading") {
+    return <View style={styles.container} />
+  }
 
   return (
     <KeyboardAvoidingView

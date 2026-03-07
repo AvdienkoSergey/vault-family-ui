@@ -19,10 +19,6 @@ function AppStack() {
   const segments = useSegments()
 
   useEffect(() => {
-    SplashScreen.hideAsync()
-  }, [])
-
-  useEffect(() => {
     const inTabs = segments[0] === "(tabs)"
     if (sessionState === "locked" && inTabs) {
       router.replace("/unlock")
