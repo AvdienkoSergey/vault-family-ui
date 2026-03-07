@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.2](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.5.1...v1.5.2) (2026-03-07)
+
+
+### Bug Fixes
+
+* **ci:** fix iOS scheme resolution with fallback and validation ([a39cf6a](https://github.com/AvdienkoSergey/vault-family-ui/commit/a39cf6a80e2182d37d7a50e2b86dd15fe816e02d))
+* **ci:** fix iOS scheme resolution with fallback and validation ([b5241ac](https://github.com/AvdienkoSergey/vault-family-ui/commit/b5241acd83e7acc2d86569a651db51948a3e12a2))
+
 ## [1.5.1](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.5.0...v1.5.1) (2026-03-07)
 
 
