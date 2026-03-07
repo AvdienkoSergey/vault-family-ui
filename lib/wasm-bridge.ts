@@ -1,111 +1,44 @@
 /**
- * WasmBridge — loads the Rust WASM crypto module and exposes its API.
+ * Crypto bridge — all operations use native Expo module (no WASM).
  *
- * Initialization uses `initSync` with the binary read from expo-asset.
- * All exported functions throw if called before `initWasm()` resolves.
+ * Android: javax.crypto (AES-GCM, PBKDF2), java.security (X25519)
+ * iOS: CryptoKit (AES-GCM, X25519), CommonCrypto (PBKDF2)
  */
-import * as FileSystem from "expo-file-system"
-import { Asset } from "expo-asset"
 import {
-  initSync,
-  init as wasmInit,
-  hashMasterPassword as _hashMasterPassword,
-  verifyMasterPassword as _verifyMasterPassword,
-  deriveEncryptionKey as _deriveEncryptionKey,
-  generateEncryptionSalt as _generateEncryptionSalt,
-  encryptEntry as _encryptEntry,
-  decryptEntry as _decryptEntry,
-  encryptRaw as _encryptRaw,
-  decryptRaw as _decryptRaw,
+  hashMasterPassword,
+  verifyMasterPassword,
+  deriveEncryptionKey,
+  generateEncryptionSalt,
+} from "./native-pbkdf2"
+import {
+  encryptAesGcm,
+  decryptAesGcm,
+  encryptAesGcmRaw,
+  decryptAesGcmRaw,
   generateX25519Keypair as _generateX25519Keypair,
   x25519DeriveSharedKey as _x25519DeriveSharedKey,
-  generateSharedVaultKey as _generateSharedVaultKey,
-  generatePassword as _generatePassword,
-} from "./crypto-wasm/vault_crypto_wasm"
+  generateSalt,
+} from "../modules/expo-vault-crypto"
+
+console.log("[CryptoBridge] Using native Expo module (no WASM)")
 
 // ---------------------------------------------------------------------------
-// Initialization
+// Initialization — no-op, kept for API compatibility
 // ---------------------------------------------------------------------------
 
-let initialized = false
-let initPromise: Promise<void> | null = null
-
-/**
- * Load and initialize the WASM module. Safe to call multiple times —
- * subsequent calls return the same promise.
- */
 export function initWasm(): Promise<void> {
-  if (initialized) return Promise.resolve()
-  if (initPromise) return initPromise
-
-  initPromise = (async () => {
-    // Load the .wasm asset bundled by Metro
-    const [asset] = await Asset.loadAsync(
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      require("./crypto-wasm/vault_crypto_wasm_bg.wasm")
-    )
-
-    const fileUri = asset.localUri
-    if (!fileUri) throw new Error("Failed to resolve WASM asset URI")
-
-    // Read as base64, convert to ArrayBuffer
-    const base64 = await FileSystem.readAsStringAsync(fileUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    })
-    const binaryString = atob(base64)
-    const bytes = new Uint8Array(binaryString.length)
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i)
-    }
-
-    // Synchronous instantiation from buffer
-    initSync(bytes.buffer)
-    wasmInit()
-    initialized = true
-  })()
-
-  initPromise.catch(() => {
-    initPromise = null // allow retry on failure
-  })
-
-  return initPromise
+  return Promise.resolve()
 }
 
 export function isWasmReady(): boolean {
-  return initialized
-}
-
-function assertReady() {
-  if (!initialized) throw new Error("WASM module not initialized — call initWasm() first")
+  return true
 }
 
 // ---------------------------------------------------------------------------
-// Master password (PBKDF2 600K iterations, PHC string format)
+// Master password (PBKDF2) — re-export from native-pbkdf2
 // ---------------------------------------------------------------------------
 
-export function hashMasterPassword(password: string): { hash: string; salt: string } {
-  assertReady()
-  return _hashMasterPassword(password)
-}
-
-export function verifyMasterPassword(password: string, hash: string): boolean {
-  assertReady()
-  return _verifyMasterPassword(password, hash)
-}
-
-// ---------------------------------------------------------------------------
-// Encryption key derivation
-// ---------------------------------------------------------------------------
-
-export function deriveEncryptionKey(password: string, salt: string): string {
-  assertReady()
-  return _deriveEncryptionKey(password, salt)
-}
-
-export function generateEncryptionSalt(): string {
-  assertReady()
-  return _generateEncryptionSalt()
-}
+export { hashMasterPassword, verifyMasterPassword, deriveEncryptionKey, generateEncryptionSalt }
 
 // ---------------------------------------------------------------------------
 // Entry encryption (AES-256-GCM)
@@ -115,8 +48,7 @@ export function encryptEntry(
   entryJson: string,
   keyHex: string,
 ): { encrypted_data: string; nonce: string } {
-  assertReady()
-  return _encryptEntry(entryJson, keyHex)
+  return encryptAesGcm(entryJson, keyHex)
 }
 
 export function decryptEntry(
@@ -124,8 +56,7 @@ export function decryptEntry(
   nonceHex: string,
   keyHex: string,
 ): string {
-  assertReady()
-  return _decryptEntry(encryptedDataHex, nonceHex, keyHex)
+  return decryptAesGcm(encryptedDataHex, nonceHex, keyHex)
 }
 
 // ---------------------------------------------------------------------------
@@ -136,8 +67,7 @@ export function encryptRaw(
   plaintextHex: string,
   keyHex: string,
 ): { encrypted_data: string; nonce: string } {
-  assertReady()
-  return _encryptRaw(plaintextHex, keyHex)
+  return encryptAesGcmRaw(plaintextHex, keyHex)
 }
 
 export function decryptRaw(
@@ -145,8 +75,7 @@ export function decryptRaw(
   nonceHex: string,
   keyHex: string,
 ): string {
-  assertReady()
-  return _decryptRaw(ciphertextHex, nonceHex, keyHex)
+  return decryptAesGcmRaw(ciphertextHex, nonceHex, keyHex)
 }
 
 // ---------------------------------------------------------------------------
@@ -154,7 +83,6 @@ export function decryptRaw(
 // ---------------------------------------------------------------------------
 
 export function generateX25519Keypair(): { public_key: string; private_key: string } {
-  assertReady()
   return _generateX25519Keypair()
 }
 
@@ -162,17 +90,24 @@ export function x25519DeriveSharedKey(
   privateKeyHex: string,
   publicKeyHex: string,
 ): string {
-  assertReady()
   return _x25519DeriveSharedKey(privateKeyHex, publicKeyHex)
 }
 
 export function generateSharedVaultKey(): string {
-  assertReady()
-  return _generateSharedVaultKey()
+  // Generate random 32-byte key (hex)
+  const saltB64 = generateSalt(32)
+  // Convert base64 to hex
+  const padded = saltB64 + "=".repeat((4 - (saltB64.length % 4)) % 4)
+  const binary = atob(padded)
+  let hex = ""
+  for (let i = 0; i < binary.length; i++) {
+    hex += binary.charCodeAt(i).toString(16).padStart(2, "0")
+  }
+  return hex
 }
 
 // ---------------------------------------------------------------------------
-// Password generator
+// Password generator (pure JS — no native needed)
 // ---------------------------------------------------------------------------
 
 export function generatePassword(
@@ -182,6 +117,21 @@ export function generatePassword(
   digits: boolean,
   symbols: boolean,
 ): string {
-  assertReady()
-  return _generatePassword(length, lowercase, uppercase, digits, symbols)
+  let charset = ""
+  if (lowercase) charset += "abcdefghijklmnopqrstuvwxyz"
+  if (uppercase) charset += "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  if (digits) charset += "0123456789"
+  if (symbols) charset += "!@#$%^&*()_+-=[]{}|;:,.<>?"
+
+  if (charset.length === 0) charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+  // Use crypto-secure random
+  const randomBytes = new Uint8Array(length)
+  crypto.getRandomValues(randomBytes)
+
+  let result = ""
+  for (let i = 0; i < length; i++) {
+    result += charset[randomBytes[i] % charset.length]
+  }
+  return result
 }
