@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.3](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.5.2...v1.5.3) (2026-03-07)
+
+
+### Bug Fixes
+
+* **ci:** fix macOS scheme resolution — match workspace name exactly ([6357085](https://github.com/AvdienkoSergey/vault-family-ui/commit/63570851d3e1e31033091785c60b9f837ce853fa))
+* **ci:** fix macOS scheme resolution — match workspace name exactly ([5dea262](https://github.com/AvdienkoSergey/vault-family-ui/commit/5dea262518700ee7b98235d3de55a5924d2b5f9f))
+
 ## [1.5.2](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.5.1...v1.5.2) (2026-03-07)
 
 
