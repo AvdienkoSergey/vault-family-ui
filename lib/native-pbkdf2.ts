@@ -8,7 +8,7 @@
 
 import { pbkdf2, generateSalt } from "../modules/expo-vault-crypto"
 
-const ITERATIONS = 100_000
+const ITERATIONS = 600_000
 const KEY_LENGTH = 32 // bytes
 
 function hexToBytes(hex: string): Uint8Array {

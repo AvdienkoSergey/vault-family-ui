@@ -327,6 +327,8 @@ function VaultDetail({
       <EntryDetail
         entry={selectedEntry}
         onBack={() => setSelectedEntry(null)}
+        onSave={() => {}}
+        onDelete={() => setSelectedEntry(null)}
       />
     )
   }
