@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react"
+import React, { useState, useEffect, useMemo, useRef } from "react"
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  ActivityIndicator,
 } from "react-native"
 import * as SplashScreen from "expo-splash-screen"
 import { Ionicons } from "@expo/vector-icons"
@@ -16,12 +18,12 @@ import { useSettings } from "@/lib/settings-context"
 import { withOpacity, radius, type ColorPalette } from "@/lib/theme"
 import { parseEmail, parsePassword } from "@/lib/types"
 import { listUsers } from "@/lib/storage"
-import { hasStoredCredentials } from "@/lib/security-service"
+import { hasStoredCredentials, isBiometricsAvailable } from "@/lib/security-service"
 
 type Mode = "loading" | "create" | "signin"
 
 export default function UnlockScreen() {
-  const { unlock, unlockWithBiometrics } = useVault()
+  const { unlock, unlockWithBiometrics, pendingBiometricEnroll, completeBiometricEnroll } = useVault()
   const { colors } = useTheme()
   const { preloadForEmail } = useSettings()
   const styles = useMemo(() => createStyles(colors), [colors])
@@ -29,18 +31,21 @@ export default function UnlockScreen() {
   const [mode, setMode] = useState<Mode>("loading")
   const [knownUsers, setKnownUsers] = useState<string[]>([])
   const [hasBiometrics, setHasBiometrics] = useState(false)
+  const [deviceHasBiometrics, setDeviceHasBiometrics] = useState(false)
   const [email, setEmail] = useState("")
   const lastSigninEmail = useRef("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    Promise.all([listUsers(), hasStoredCredentials()]).then(
-      ([users, bioAvailable]) => {
+    Promise.all([listUsers(), hasStoredCredentials(), isBiometricsAvailable()]).then(
+      ([users, bioAvailable, deviceBio]) => {
         setKnownUsers(users)
         setHasBiometrics(bioAvailable)
+        setDeviceHasBiometrics(deviceBio)
         if (users.length > 0) {
           setEmail(users[0])
           lastSigninEmail.current = users[0]
@@ -55,7 +60,7 @@ export default function UnlockScreen() {
 
   const isCreate = mode === "create"
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError("")
 
     const emailResult = parseEmail(email)
@@ -75,12 +80,29 @@ export default function UnlockScreen() {
       return
     }
 
-    unlock(emailResult.value, passwordResult.value)
+    setSubmitting(true)
+    const result = await unlock(emailResult.value, passwordResult.value)
+    setSubmitting(false)
+
+    if (result.error) {
+      setError(result.error)
+      return
+    }
+
+    setPassword("")
+    setConfirmPassword("")
   }
 
   const canSubmit = isCreate
     ? email.includes("@") && password.length >= 8 && confirmPassword.length > 0
     : email.includes("@") && password.length >= 1
+
+  // Auto-dismiss biometric enrollment if device doesn't support biometrics
+  useEffect(() => {
+    if (pendingBiometricEnroll && !deviceHasBiometrics) {
+      completeBiometricEnroll(false)
+    }
+  }, [pendingBiometricEnroll, deviceHasBiometrics])
 
   useEffect(() => {
     if (mode !== "loading") {
@@ -195,18 +217,24 @@ export default function UnlockScreen() {
           {error !== "" && <Text style={styles.error}>{error}</Text>}
 
           <Pressable
-            style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
+            style={[styles.submitBtn, (!canSubmit || submitting) && styles.submitBtnDisabled]}
             onPress={handleSubmit}
-            disabled={!canSubmit}
+            disabled={!canSubmit || submitting}
           >
-            <Ionicons
-              name={isCreate ? "add-circle" : "lock-open"}
-              size={16}
-              color={colors.primaryForeground}
-            />
-            <Text style={styles.submitText}>
-              {isCreate ? "Create Vault" : "Sign In"}
-            </Text>
+            {submitting ? (
+              <ActivityIndicator size="small" color={colors.primaryForeground} />
+            ) : (
+              <>
+                <Ionicons
+                  name={isCreate ? "add-circle" : "lock-open"}
+                  size={16}
+                  color={colors.primaryForeground}
+                />
+                <Text style={styles.submitText}>
+                  {isCreate ? "Create Vault" : "Sign In"}
+                </Text>
+              </>
+            )}
           </Pressable>
         </View>
 
@@ -247,6 +275,44 @@ export default function UnlockScreen() {
           </Pressable>
         </View>
       </View>
+
+      {/* Biometric enrollment modal — only shown if device supports biometrics */}
+      {pendingBiometricEnroll && deviceHasBiometrics && (
+        <Modal
+          transparent
+          animationType="fade"
+          visible
+          onRequestClose={() => completeBiometricEnroll(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => {}}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalIconWrap}>
+                <Ionicons name="finger-print" size={36} color={colors.primary} />
+              </View>
+              <Text style={styles.modalTitle}>Enable Biometric Unlock?</Text>
+              <Text style={styles.modalDesc}>
+                Use your fingerprint or face to unlock the vault quickly next time.
+              </Text>
+              <View style={styles.modalActions}>
+                <Pressable
+                  style={styles.modalBtnSecondary}
+                  onPress={() => completeBiometricEnroll(false)}
+                >
+                  <Text style={styles.modalBtnSecondaryText}>Not Now</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.modalBtnPrimary}
+                  onPress={() => completeBiometricEnroll(true)}
+                >
+                  <Ionicons name="finger-print" size={16} color={colors.primaryForeground} />
+                  <Text style={styles.modalBtnPrimaryText}>Enable</Text>
+                </Pressable>
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
+      )}
+
     </KeyboardAvoidingView>
   )
 }
@@ -396,5 +462,79 @@ const createStyles = (colors: ColorPalette) =>
     switchText: {
       fontSize: 12,
       color: colors.mutedForeground,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.6)",
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: 32,
+    },
+    modalCard: {
+      backgroundColor: colors.card,
+      borderRadius: radius.xl,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 24,
+      width: "100%",
+      alignItems: "center",
+      gap: 12,
+    },
+    modalIconWrap: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: withOpacity(colors.primary, 0.15),
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 4,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: colors.foreground,
+      textAlign: "center",
+    },
+    modalDesc: {
+      fontSize: 13,
+      color: colors.mutedForeground,
+      textAlign: "center",
+      lineHeight: 18,
+    },
+    modalActions: {
+      flexDirection: "row",
+      gap: 12,
+      marginTop: 8,
+      width: "100%",
+    },
+    modalBtnSecondary: {
+      flex: 1,
+      height: 44,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: radius.md,
+      backgroundColor: colors.secondary,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    modalBtnSecondaryText: {
+      fontSize: 14,
+      fontWeight: "500",
+      color: colors.foreground,
+    },
+    modalBtnPrimary: {
+      flex: 1,
+      height: 44,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      borderRadius: radius.md,
+      backgroundColor: colors.primary,
+    },
+    modalBtnPrimaryText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: colors.primaryForeground,
     },
   })
