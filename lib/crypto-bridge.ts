@@ -1,5 +1,5 @@
 /**
- * Crypto bridge — all operations use native Expo module (no WASM).
+ * Crypto bridge — all operations use native Expo module.
  *
  * Android: javax.crypto (AES-GCM, PBKDF2), java.security (X25519)
  * iOS: CryptoKit (AES-GCM, X25519), CommonCrypto (PBKDF2)
@@ -20,22 +20,8 @@ import {
   generateSalt,
 } from "../modules/expo-vault-crypto"
 
-console.log("[CryptoBridge] Using native Expo module (no WASM)")
-
 // ---------------------------------------------------------------------------
-// Initialization — no-op, kept for API compatibility
-// ---------------------------------------------------------------------------
-
-export function initWasm(): Promise<void> {
-  return Promise.resolve()
-}
-
-export function isWasmReady(): boolean {
-  return true
-}
-
-// ---------------------------------------------------------------------------
-// Master password (PBKDF2) — re-export from native-pbkdf2
+// Master password (PBKDF2)
 // ---------------------------------------------------------------------------
 
 export { hashMasterPassword, verifyMasterPassword, deriveEncryptionKey, generateEncryptionSalt }
@@ -94,9 +80,7 @@ export function x25519DeriveSharedKey(
 }
 
 export function generateSharedVaultKey(): string {
-  // Generate random 32-byte key (hex)
   const saltB64 = generateSalt(32)
-  // Convert base64 to hex
   const padded = saltB64 + "=".repeat((4 - (saltB64.length % 4)) % 4)
   const binary = atob(padded)
   let hex = ""
@@ -107,7 +91,7 @@ export function generateSharedVaultKey(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Password generator (pure JS — no native needed)
+// Password generator (pure JS, crypto-secure random)
 // ---------------------------------------------------------------------------
 
 export function generatePassword(
@@ -125,7 +109,6 @@ export function generatePassword(
 
   if (charset.length === 0) charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-  // Use crypto-secure random
   const randomBytes = new Uint8Array(length)
   crypto.getRandomValues(randomBytes)
 

@@ -1,6 +1,6 @@
 /**
  * Master key management — stores password hash + encryption salt per user.
- * Uses WASM crypto module (PBKDF2 600K iterations, PHC format).
+ * Uses native PBKDF2-HMAC-SHA256 (100K iterations, PHC format).
  */
 import * as FileSystem from "expo-file-system"
 import type { Email, Password } from "./types"
@@ -9,7 +9,7 @@ import {
   verifyMasterPassword,
   deriveEncryptionKey,
   generateEncryptionSalt,
-} from "./wasm-bridge"
+} from "./crypto-bridge"
 
 const USERS_ROOT = `${FileSystem.documentDirectory}users/`
 const MASTER_KEY_FILE = "master.key"

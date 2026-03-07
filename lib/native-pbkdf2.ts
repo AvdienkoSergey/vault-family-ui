@@ -85,14 +85,14 @@ export async function verifyMasterPassword(
 
 /**
  * Derive an encryption key from password + hex salt string.
- * The salt is used as raw ASCII string bytes (matching original WASM behavior).
+ * The salt is used as raw ASCII string bytes (matching server behavior).
  * Returns a 32-byte hex-encoded key.
  */
 export async function deriveEncryptionKey(
   password: string,
   saltHex: string,
 ): Promise<string> {
-  // Original WASM passes the hex string as raw ASCII bytes to PBKDF2.
+  // Server passes the hex string as raw ASCII bytes to PBKDF2.
   // Our native module expects base64 salt, so encode the raw ASCII bytes as base64.
   const encoder = new TextEncoder()
   const saltBytes = encoder.encode(saltHex)
