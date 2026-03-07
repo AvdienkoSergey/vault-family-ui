@@ -63,3 +63,48 @@ jobs:
           files: android/app/build/outputs/apk/release/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-ios:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prebuild native project
+        run: npx expo prebuild --platform ios
+
+      - name: Install CocoaPods
+        run: cd ios && pod install
+
+      - name: Build iOS Simulator (Release)
+        run: |
+          xcodebuild -workspace ios/*.xcworkspace \
+            -scheme VaultFamily \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -derivedDataPath $RUNNER_TEMP/build \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Archive .app for release
+        run: |
+          cd $RUNNER_TEMP/build/Build/Products/Release-iphonesimulator
+          tar -czf $RUNNER_TEMP/VaultFamily-ios-simulator.tar.gz *.app
+
+      - name: Upload iOS build to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          files: ${{ runner.temp }}/VaultFamily-ios-simulator.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
