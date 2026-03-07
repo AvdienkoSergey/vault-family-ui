@@ -8,6 +8,8 @@ import { useSettings } from "@/lib/settings-context"
 import { listUserFiles, deleteUserDir, type VaultFileInfo } from "@/lib/storage"
 import { clearCredentials } from "@/lib/security-service"
 import { withOpacity, radius, type ColorPalette } from "@/lib/theme"
+import { exportArchive } from "@/lib/archive-service"
+import { uploadArchive, getTransferLimits } from "@/lib/transfer-service"
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -24,7 +26,7 @@ function fileIcon(name: string, isDirectory: boolean): keyof typeof MaterialComm
 }
 
 export default function SettingsScreen() {
-  const { currentUser, userDir, lock, changePassword } = useVault()
+  const { currentUser, currentEmail, userDir, lock, changePassword } = useVault()
   const { colors, colorScheme, toggleTheme } = useTheme()
   const { settings, update } = useSettings()
   const styles = useMemo(() => createStyles(colors), [colors])
@@ -43,6 +45,15 @@ export default function SettingsScreen() {
 
   // Auto-lock picker
   const [showAutoLockPicker, setShowAutoLockPicker] = useState(false)
+
+  // Transfer modal
+  const [showTransferModal, setShowTransferModal] = useState(false)
+  const [transferCode, setTransferCode] = useState("")
+  const [transferCopies, setTransferCopies] = useState(1)
+  const [transferLoading, setTransferLoading] = useState(false)
+  const [transferError, setTransferError] = useState("")
+  const [transferStep, setTransferStep] = useState<"config" | "result">("config")
+  const [transferPassword, setTransferPassword] = useState("")
 
   const refreshFiles = useCallback(async () => {
     if (!userDir) return
@@ -175,6 +186,23 @@ export default function SettingsScreen() {
             setCpConfirmPw("")
             setCpError("")
             setShowChangePwModal(true)
+          }}
+        />
+        <View style={styles.divider} />
+        <SettingRow
+          colors={colors}
+          styles={styles}
+          icon={<Ionicons name="cloud-upload" size={16} color={colors.mutedForeground} />}
+          label="Transfer to Device"
+          description="Encrypted backup via one-time code"
+          chevron
+          onPress={() => {
+            setTransferCode("")
+            setTransferCopies(1)
+            setTransferError("")
+            setTransferStep("config")
+            setTransferPassword("")
+            setShowTransferModal(true)
           }}
         />
       </View>
@@ -354,6 +382,129 @@ export default function SettingsScreen() {
                 )}
               </Pressable>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Transfer to Device Modal */}
+      <Modal
+        visible={showTransferModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !transferLoading && setShowTransferModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={[styles.modalIconWrap, { backgroundColor: withOpacity(colors.primary, 0.12) }]}>
+              <Ionicons name="cloud-upload" size={28} color={colors.primary} />
+            </View>
+            <Text style={styles.modalTitle}>Transfer to Device</Text>
+
+            {transferStep === "config" ? (
+              <>
+                <Text style={styles.modalDesc}>
+                  Create an encrypted backup and get a one-time code to transfer it to another device.
+                </Text>
+                <TextInput
+                  style={styles.cpInput}
+                  value={transferPassword}
+                  onChangeText={setTransferPassword}
+                  placeholder="Master password"
+                  placeholderTextColor={colors.mutedForeground}
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+                <View style={styles.copiesRow}>
+                  <Text style={styles.copiesLabel}>Downloads allowed</Text>
+                  <View style={styles.copiesStepper}>
+                    <Pressable
+                      style={[styles.copiesBtn, transferCopies <= 1 && styles.copiesBtnDisabled]}
+                      disabled={transferCopies <= 1}
+                      onPress={() => setTransferCopies((c) => Math.max(1, c - 1))}
+                    >
+                      <Ionicons name="remove" size={16} color={transferCopies <= 1 ? colors.mutedForeground : colors.foreground} />
+                    </Pressable>
+                    <Text style={styles.copiesValue}>{transferCopies}</Text>
+                    <Pressable
+                      style={[styles.copiesBtn, transferCopies >= getTransferLimits().maxDevices && styles.copiesBtnDisabled]}
+                      disabled={transferCopies >= getTransferLimits().maxDevices}
+                      onPress={() => setTransferCopies((c) => Math.min(getTransferLimits().maxDevices, c + 1))}
+                    >
+                      <Ionicons name="add" size={16} color={transferCopies >= getTransferLimits().maxDevices ? colors.mutedForeground : colors.foreground} />
+                    </Pressable>
+                  </View>
+                </View>
+                <Text style={styles.copiesHint}>
+                  Free tier: max {getTransferLimits().maxDevices} device{getTransferLimits().maxDevices > 1 ? "s" : ""}
+                </Text>
+                {transferError !== "" && <Text style={styles.cpError}>{transferError}</Text>}
+                <View style={styles.modalActions}>
+                  <Pressable
+                    style={styles.modalCancelBtn}
+                    onPress={() => setShowTransferModal(false)}
+                  >
+                    <Text style={styles.modalCancelText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.modalSaveBtn, transferLoading && { opacity: 0.5 }]}
+                    disabled={transferLoading}
+                    onPress={async () => {
+                      if (!currentEmail) return
+                      if (!transferPassword) {
+                        setTransferError("Enter your master password")
+                        return
+                      }
+                      setTransferError("")
+                      setTransferLoading(true)
+                      try {
+                        const archiveResult = await exportArchive(currentEmail, transferPassword)
+                        if (!archiveResult.ok) {
+                          setTransferError(archiveResult.error)
+                          return
+                        }
+                        const uploadResult = await uploadArchive(archiveResult.archive, transferCopies)
+                        if (!uploadResult.ok) {
+                          setTransferError(uploadResult.error)
+                          return
+                        }
+                        setTransferCode(uploadResult.code)
+                        setTransferCopies(uploadResult.copies)
+                        setTransferStep("result")
+                      } catch (e) {
+                        setTransferError(e instanceof Error ? e.message : "Unknown error")
+                      } finally {
+                        setTransferLoading(false)
+                        setTransferPassword("")
+                      }
+                    }}
+                  >
+                    {transferLoading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.modalSaveText}>Generate Code</Text>
+                    )}
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={styles.transferCodeDisplay}>{transferCode}</Text>
+                <Text style={styles.modalDesc}>
+                  Enter this code on the other device to download your vault. Code expires in 10 minutes.
+                </Text>
+                <Text style={styles.copiesHint}>
+                  Downloads allowed: {transferCopies}
+                </Text>
+                <View style={styles.modalActions}>
+                  <Pressable
+                    style={[styles.modalSaveBtn, { flex: 1 }]}
+                    onPress={() => setShowTransferModal(false)}
+                  >
+                    <Text style={styles.modalSaveText}>Done</Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -811,5 +962,56 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
   alOptionTextActive: {
     color: colors.primary,
     fontWeight: "600",
+  },
+  copiesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    paddingHorizontal: 4,
+  },
+  copiesLabel: {
+    fontSize: 12,
+    color: colors.foreground,
+  },
+  copiesStepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 0,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: "hidden",
+  },
+  copiesBtn: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.secondary,
+  },
+  copiesBtnDisabled: {
+    opacity: 0.4,
+  },
+  copiesValue: {
+    width: 36,
+    textAlign: "center",
+    fontSize: 14,
+    fontWeight: "600",
+    fontFamily: "monospace",
+    color: colors.foreground,
+  },
+  copiesHint: {
+    fontSize: 10,
+    color: colors.mutedForeground,
+    textAlign: "center",
+  },
+  transferCodeDisplay: {
+    fontSize: 32,
+    fontWeight: "700",
+    fontFamily: "monospace",
+    color: colors.primary,
+    letterSpacing: 4,
+    paddingVertical: 8,
   },
 })
