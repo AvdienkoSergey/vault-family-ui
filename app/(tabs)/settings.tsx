@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useEffect, useCallback } from "react"
-import { View, Text, ScrollView, Pressable, Switch, StyleSheet, ActivityIndicator, Modal } from "react-native"
+import { View, Text, ScrollView, Pressable, Switch, StyleSheet, ActivityIndicator, Modal, TextInput } from "react-native"
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons"
 import { useVault } from "@/lib/vault-context"
+import { parsePassword } from "@/lib/types"
 import { useTheme } from "@/lib/theme-context"
 import { useSettings } from "@/lib/settings-context"
 import { listUserFiles, deleteUserDir, type VaultFileInfo } from "@/lib/storage"
@@ -23,7 +24,7 @@ function fileIcon(name: string, isDirectory: boolean): keyof typeof MaterialComm
 }
 
 export default function SettingsScreen() {
-  const { currentUser, userDir, lock } = useVault()
+  const { currentUser, userDir, lock, changePassword } = useVault()
   const { colors, colorScheme, toggleTheme } = useTheme()
   const { settings, update } = useSettings()
   const styles = useMemo(() => createStyles(colors), [colors])
@@ -31,6 +32,17 @@ export default function SettingsScreen() {
   const [files, setFiles] = useState<VaultFileInfo[]>([])
   const [filesLoading, setFilesLoading] = useState(true)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+
+  // Change password modal
+  const [showChangePwModal, setShowChangePwModal] = useState(false)
+  const [cpOldPw, setCpOldPw] = useState("")
+  const [cpNewPw, setCpNewPw] = useState("")
+  const [cpConfirmPw, setCpConfirmPw] = useState("")
+  const [cpError, setCpError] = useState("")
+  const [cpLoading, setCpLoading] = useState(false)
+
+  // Auto-lock picker
+  const [showAutoLockPicker, setShowAutoLockPicker] = useState(false)
 
   const refreshFiles = useCallback(async () => {
     if (!userDir) return
@@ -98,10 +110,8 @@ export default function SettingsScreen() {
           styles={styles}
           icon={<Ionicons name="time" size={16} color={colors.mutedForeground} />}
           label="Auto-lock Timeout"
-          value="5 minutes"
-          onPress={() => {
-            throw new Error("NOT_IMPLEMENTED: show auto-lock timeout picker (1min, 5min, 15min, 30min, never)")
-          }}
+          value={settings.autoLockTimeout === 0 ? "Never" : `${settings.autoLockTimeout} min`}
+          onPress={() => setShowAutoLockPicker(true)}
         />
         <View style={styles.divider} />
         <SettingRow
@@ -160,7 +170,11 @@ export default function SettingsScreen() {
           label="Change Master Password"
           chevron
           onPress={() => {
-            throw new Error("NOT_IMPLEMENTED: navigate to Change Master Password flow (verify current, enter new, re-derive keys via WasmBridge)")
+            setCpOldPw("")
+            setCpNewPw("")
+            setCpConfirmPw("")
+            setCpError("")
+            setShowChangePwModal(true)
           }}
         />
       </View>
@@ -216,11 +230,11 @@ export default function SettingsScreen() {
       <View style={styles.card}>
         <SystemRow styles={styles} label="Backend" value="Rust / Axum" />
         <View style={styles.divider} />
-        <SystemRow styles={styles} label="Encryption" value="XChaCha20-Poly1305" />
+        <SystemRow styles={styles} label="Encryption" value="AES-256-GCM" />
         <View style={styles.divider} />
         <SystemRow styles={styles} label="Key Exchange" value="X25519" />
         <View style={styles.divider} />
-        <SystemRow styles={styles} label="KDF" value="Argon2id" />
+        <SystemRow styles={styles} label="KDF" value="PBKDF2 (600K)" />
       </View>
 
       {/* Delete Account Modal */}
@@ -264,6 +278,129 @@ export default function SettingsScreen() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Change Master Password Modal */}
+      <Modal
+        visible={showChangePwModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowChangePwModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalIconWrap}>
+              <Ionicons name="key" size={28} color={colors.primary} />
+            </View>
+            <Text style={styles.modalTitle}>Change Master Password</Text>
+            <View style={styles.cpInputWrap}>
+              <TextInput
+                style={styles.cpInput}
+                value={cpOldPw}
+                onChangeText={setCpOldPw}
+                placeholder="Current password"
+                placeholderTextColor={colors.mutedForeground}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+              <TextInput
+                style={styles.cpInput}
+                value={cpNewPw}
+                onChangeText={setCpNewPw}
+                placeholder="New password"
+                placeholderTextColor={colors.mutedForeground}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+              <TextInput
+                style={styles.cpInput}
+                value={cpConfirmPw}
+                onChangeText={setCpConfirmPw}
+                placeholder="Confirm new password"
+                placeholderTextColor={colors.mutedForeground}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </View>
+            {cpError !== "" && <Text style={styles.cpError}>{cpError}</Text>}
+            <View style={styles.modalActions}>
+              <Pressable
+                style={styles.modalCancelBtn}
+                onPress={() => setShowChangePwModal(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalSaveBtn, cpLoading && { opacity: 0.5 }]}
+                disabled={cpLoading}
+                onPress={async () => {
+                  setCpError("")
+                  const oldResult = parsePassword(cpOldPw)
+                  if (!oldResult.ok) { setCpError(oldResult.error); return }
+                  const newResult = parsePassword(cpNewPw)
+                  if (!newResult.ok) { setCpError(newResult.error); return }
+                  if (cpNewPw !== cpConfirmPw) { setCpError("Passwords do not match"); return }
+                  setCpLoading(true)
+                  const result = await changePassword(oldResult.value, newResult.value)
+                  setCpLoading(false)
+                  if (result.error) { setCpError(result.error); return }
+                  setShowChangePwModal(false)
+                }}
+              >
+                {cpLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalSaveText}>Save</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Auto-lock Timeout Picker */}
+      <Modal
+        visible={showAutoLockPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAutoLockPicker(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowAutoLockPicker(false)}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Auto-lock Timeout</Text>
+            {[
+              { label: "1 minute", value: 1 },
+              { label: "5 minutes", value: 5 },
+              { label: "15 minutes", value: 15 },
+              { label: "30 minutes", value: 30 },
+              { label: "Never", value: 0 },
+            ].map((opt) => (
+              <Pressable
+                key={opt.value}
+                style={[
+                  styles.alOption,
+                  settings.autoLockTimeout === opt.value && styles.alOptionActive,
+                ]}
+                onPress={() => {
+                  update("autoLockTimeout", opt.value)
+                  setShowAutoLockPicker(false)
+                }}
+              >
+                <Text
+                  style={[
+                    styles.alOptionText,
+                    settings.autoLockTimeout === opt.value && styles.alOptionTextActive,
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+                {settings.autoLockTimeout === opt.value && (
+                  <Ionicons name="checkmark" size={16} color={colors.primary} />
+                )}
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
       </Modal>
 
     </ScrollView>
@@ -622,5 +759,57 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: "#fff",
+  },
+  modalSaveBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalSaveText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.primaryForeground,
+  },
+  cpInputWrap: {
+    width: "100%",
+    gap: 8,
+  },
+  cpInput: {
+    height: 40,
+    backgroundColor: colors.input,
+    borderRadius: radius.md,
+    paddingHorizontal: 12,
+    fontSize: 13,
+    color: colors.foreground,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  cpError: {
+    fontSize: 11,
+    color: colors.destructive,
+    textAlign: "center",
+  },
+  alOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: radius.md,
+  },
+  alOptionActive: {
+    backgroundColor: withOpacity(colors.primary, 0.1),
+  },
+  alOptionText: {
+    fontSize: 13,
+    color: colors.foreground,
+  },
+  alOptionTextActive: {
+    color: colors.primary,
+    fontWeight: "600",
   },
 })

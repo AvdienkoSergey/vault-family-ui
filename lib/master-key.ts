@@ -80,3 +80,32 @@ export async function verifyAndDeriveKey(
 
   return deriveEncryptionKey(password, data.encryption_salt)
 }
+
+/**
+ * Change master password: verify old, re-hash with new, re-derive encryption key.
+ * The encryption_salt stays the same so existing encrypted entries remain accessible.
+ * Returns the new encryption key on success, null if old password is wrong.
+ */
+export async function changeMasterPassword(
+  email: Email,
+  oldPassword: Password,
+  newPassword: Password,
+): Promise<string | null> {
+  const path = userKeyPath(email)
+  const info = await FileSystem.getInfoAsync(path)
+  if (!info.exists) return null
+
+  const raw = await FileSystem.readAsStringAsync(path)
+  const data = JSON.parse(raw) as MasterKeyData
+
+  if (!verifyMasterPassword(oldPassword, data.hash)) return null
+
+  // Re-hash with new password, keep the same encryption_salt
+  const { hash: newHash } = hashMasterPassword(newPassword)
+  const newKey = deriveEncryptionKey(newPassword, data.encryption_salt)
+
+  const updated: MasterKeyData = { ...data, hash: newHash }
+  await FileSystem.writeAsStringAsync(path, JSON.stringify(updated))
+
+  return newKey
+}

@@ -3,11 +3,12 @@ import type { SessionState, UserProfile, Email, Password } from "./types"
 import { parseEmail, parsePassword } from "./types"
 import { ensureUserDir } from "./storage"
 import { storeCredentials, retrieveCredentials, hasStoredCredentials } from "./security-service"
-import { hasMasterKey, createMasterKey, verifyAndDeriveKey } from "./master-key"
+import { hasMasterKey, createMasterKey, verifyAndDeriveKey, changeMasterPassword as changeMasterPw } from "./master-key"
 import { initWasm } from "./wasm-bridge"
 
 interface VaultContextType {
   currentUser: UserProfile | null
+  currentEmail: Email | null
   userDir: string | null
   sessionState: SessionState
   encryptionKey: string | null
@@ -16,6 +17,7 @@ interface VaultContextType {
   unlockWithBiometrics: () => Promise<boolean>
   lock: () => void
   completeBiometricEnroll: (accepted: boolean) => void
+  changePassword: (oldPassword: Password, newPassword: Password) => Promise<{ error?: string }>
 }
 
 const VaultContext = createContext<VaultContextType | null>(null)
@@ -23,6 +25,7 @@ const VaultContext = createContext<VaultContextType | null>(null)
 async function activateSession(
   email: Email,
   setCurrentUser: (u: UserProfile) => void,
+  setCurrentEmail: (e: Email) => void,
   setUserDir: (d: string) => void,
   setSessionState: (s: SessionState) => void,
 ) {
@@ -34,6 +37,7 @@ async function activateSession(
     role: "owner",
     avatar: name.charAt(0).toUpperCase(),
   })
+  setCurrentEmail(email)
   setUserDir(dir)
   setSessionState("active")
 }
@@ -42,6 +46,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   const [sessionState, setSessionState] = useState<SessionState>("locked")
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null)
   const [userDir, setUserDir] = useState<string | null>(null)
+  const [currentEmail, setCurrentEmail] = useState<Email | null>(null)
   const [encryptionKey, setEncryptionKey] = useState<string | null>(null)
   const [pendingBiometricEnroll, setPendingBiometricEnroll] = useState(false)
   const pendingCredsRef = useRef<{ email: Email; password: Password } | null>(null)
@@ -60,7 +65,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       setEncryptionKey(key)
     }
 
-    await activateSession(email, setCurrentUser, setUserDir, setSessionState)
+    await activateSession(email, setCurrentUser, setCurrentEmail, setUserDir, setSessionState)
 
     // Only offer biometric enrollment if not already enrolled
     const alreadyEnrolled = await hasStoredCredentials()
@@ -97,12 +102,22 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     if (!key) return false
 
     setEncryptionKey(key)
-    await activateSession(emailResult.value, setCurrentUser, setUserDir, setSessionState)
+    await activateSession(emailResult.value, setCurrentUser, setCurrentEmail, setUserDir, setSessionState)
     return true
   }, [])
 
+  const changePassword = useCallback(async (oldPassword: Password, newPassword: Password): Promise<{ error?: string }> => {
+    if (!currentEmail) return { error: "No active session" }
+    const newKey = await changeMasterPw(currentEmail, oldPassword, newPassword)
+    if (!newKey) return { error: "Current password is incorrect" }
+    setEncryptionKey(newKey)
+    storeCredentials(currentEmail, newPassword).catch(() => {})
+    return {}
+  }, [currentEmail])
+
   const lock = useCallback(() => {
     setCurrentUser(null)
+    setCurrentEmail(null)
     setUserDir(null)
     setEncryptionKey(null)
     setSessionState("locked")
@@ -112,6 +127,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     <VaultContext.Provider
       value={{
         currentUser,
+        currentEmail,
         userDir,
         sessionState,
         encryptionKey,
@@ -120,6 +136,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         unlockWithBiometrics,
         lock,
         completeBiometricEnroll,
+        changePassword,
       }}
     >
       {children}
