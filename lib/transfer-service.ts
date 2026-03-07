@@ -70,7 +70,7 @@ export async function uploadArchive(
   copies?: number,
 ): Promise<UploadResult> {
   const maxDevices = limits.maxDevices
-  const requestedCopies = Math.min(Math.max(copies ?? maxDevices, 1), maxDevices)
+  const requestedCopies = Math.min(Math.max(copies ?? 1, 1), maxDevices)
   const payload = serializeArchive(archive)
 
   try {
