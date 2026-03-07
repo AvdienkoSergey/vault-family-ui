@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.5.0](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.4.0...v1.5.0) (2026-03-07)
+
+
+### Features
+
+* SQLite encrypted vault storage and biometric fast-path unlock ([34fd707](https://github.com/AvdienkoSergey/vault-family-ui/commit/34fd707604b14376d73b833b27ee4499dd0e7ea8))
+
+
+### Bug Fixes
+
+* **ci:** improve iOS build debugging and error handling ([a32efbc](https://github.com/AvdienkoSergey/vault-family-ui/commit/a32efbc0e329247613e6fb5530f9aa664abe9141))
+* **ci:** improve iOS build debugging and error handling ([e2ab437](https://github.com/AvdienkoSergey/vault-family-ui/commit/e2ab43795d9dfaac43cae88510ec823693356859))
+
 ## [1.4.0](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.3.2...v1.4.0) (2026-03-07)
 
 
