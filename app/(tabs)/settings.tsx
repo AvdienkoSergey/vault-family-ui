@@ -149,21 +149,6 @@ export default function SettingsScreen() {
           colors={colors}
           styles={styles}
           icon={
-            <Ionicons name="shield" size={16} color={colors.mutedForeground} />
-          }
-          label="Zeroize on Close"
-          description="Clear decrypted data from memory when app closes"
-          toggle
-          checked={settings.zeroizeOnClose}
-          onToggle={(v) => {
-            update("zeroizeOnClose", v)
-          }}
-        />
-        <View style={styles.divider} />
-        <SettingRow
-          colors={colors}
-          styles={styles}
-          icon={
             <Ionicons
               name={colorScheme === "dark" ? "moon" : "sunny"}
               size={16}
