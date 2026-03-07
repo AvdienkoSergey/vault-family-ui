@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useEffect, useMemo } from "react"
 import {
   View,
   Text,
@@ -11,8 +11,11 @@ import { Ionicons } from "@expo/vector-icons"
 import { useTheme } from "@/lib/theme-context"
 import { withOpacity, radius, type ColorPalette } from "@/lib/theme"
 import { copyToClipboard } from "@/lib/clipboard"
+import {
+  isWasmReady,
+  generatePassword as wasmGeneratePassword,
+} from "@/lib/wasm-bridge"
 
-// TODO: replace Math.random with crypto.getRandomValues or WASM-based CSPRNG
 function generatePassword(
   length: number,
   uppercase: boolean,
@@ -20,13 +23,17 @@ function generatePassword(
   numbers: boolean,
   symbols: boolean
 ): string {
+  if (isWasmReady()) {
+    // WASM signature: (length, lowercase, uppercase, digits, symbols)
+    return wasmGeneratePassword(length, lowercase, uppercase, numbers, symbols)
+  }
+  // Fallback before WASM init (initial render only)
   let chars = ""
   if (uppercase) chars += "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
   if (lowercase) chars += "abcdefghijklmnopqrstuvwxyz"
   if (numbers) chars += "0123456789"
   if (symbols) chars += "!@#$%^&*()_+-=[]{}|;:,.<>?"
   if (chars === "") chars = "abcdefghijklmnopqrstuvwxyz"
-
   let password = ""
   for (let i = 0; i < length; i++) {
     password += chars[Math.floor(Math.random() * chars.length)]
@@ -63,13 +70,20 @@ export default function GeneratorScreen() {
   )
   const [copied, setCopied] = useState(false)
 
+  // Regenerate with WASM once it's ready (replaces initial fallback password)
+  useEffect(() => {
+    if (isWasmReady()) {
+      setPassword(generatePassword(length, uppercase, lowercase, numbers, symbols))
+    }
+  }, [])
+
   const regenerate = useCallback(() => {
     setPassword(generatePassword(length, uppercase, lowercase, numbers, symbols))
     setCopied(false)
   }, [length, uppercase, lowercase, numbers, symbols])
 
-  const handleCopy = () => {
-    copyToClipboard(password)
+  const handleCopy = async () => {
+    await copyToClipboard(password)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
