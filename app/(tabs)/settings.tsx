@@ -79,6 +79,24 @@ export default function SettingsScreen() {
         <Text style={styles.headerSub}>Security and vault configuration</Text>
       </View>
 
+      {/* Toolbar: theme + language */}
+      <View style={styles.toolbarRow}>
+        <Pressable style={styles.toolbarBtn} onPress={toggleTheme}>
+          <Ionicons
+            name={colorScheme === "dark" ? "moon" : "sunny"}
+            size={16}
+            color={colors.foreground}
+          />
+          <Text style={styles.toolbarBtnText}>
+            {colorScheme === "dark" ? "Dark" : "Light"}
+          </Text>
+        </Pressable>
+        <Pressable style={styles.toolbarBtn} onPress={() => {}}>
+          <Ionicons name="language" size={16} color={colors.foreground} />
+          <Text style={styles.toolbarBtnText}>English</Text>
+        </Pressable>
+      </View>
+
       {/* Profile */}
       <View style={styles.card}>
         <View style={styles.profileRow}>
@@ -143,22 +161,6 @@ export default function SettingsScreen() {
           onToggle={(v) => {
             update("biometricEnabled", v)
           }}
-        />
-        <View style={styles.divider} />
-        <SettingRow
-          colors={colors}
-          styles={styles}
-          icon={
-            <Ionicons
-              name={colorScheme === "dark" ? "moon" : "sunny"}
-              size={16}
-              color={colors.mutedForeground}
-            />
-          }
-          label="Dark Theme"
-          toggle
-          checked={colorScheme === "dark"}
-          onToggle={toggleTheme}
         />
         <View style={styles.divider} />
         <SettingRow
@@ -612,6 +614,28 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     fontSize: 12,
     color: colors.mutedForeground,
     marginTop: 2,
+  },
+  toolbarRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
+  },
+  toolbarBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: radius.md,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  toolbarBtnText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: colors.foreground,
   },
   sectionTitle: {
     fontSize: 12,
