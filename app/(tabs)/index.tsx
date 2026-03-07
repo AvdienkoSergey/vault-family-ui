@@ -150,7 +150,7 @@ export default function VaultScreen() {
             <Text style={styles.emptyTitle}>Loading...</Text>
           </View>
         ) : filteredEntries.length === 0 ? (
-          <View style={styles.emptyState}>
+          <Pressable style={styles.emptyState} onPress={search ? undefined : () => setShowAddModal(true)}>
             <Ionicons
               name={search ? "search" : "add-circle-outline"}
               size={32}
@@ -162,7 +162,7 @@ export default function VaultScreen() {
             <Text style={styles.emptySub}>
               {search ? "Try a different search term" : "Tap + to add your first entry"}
             </Text>
-          </View>
+          </Pressable>
         ) : (
           filteredEntries.map((entry) => (
             <VaultEntryCard
