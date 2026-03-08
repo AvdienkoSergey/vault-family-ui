@@ -5,6 +5,7 @@
  * Encrypted blob (AES-256-GCM): { title, url, login, password } → encrypted_data + nonce
  */
 import * as SQLite from "expo-sqlite"
+import * as FileSystem from "expo-file-system"
 import * as Crypto from "expo-crypto"
 import { encryptEntry, decryptEntry } from "./crypto-bridge"
 import type { VaultEntry, VaultType } from "./types"
@@ -24,10 +25,20 @@ function assertDb(): SQLite.SQLiteDatabase {
 // Lifecycle
 // ---------------------------------------------------------------------------
 
+function dbFileName(email: string): string {
+  const safeName = email.replace(/[^a-zA-Z0-9._-]/g, "_")
+  return `vault_${safeName}.db`
+}
+
+function userDbDirectory(email: string): string {
+  const safe = email.replace(/[^a-zA-Z0-9@._-]/g, "_")
+  return `${FileSystem.documentDirectory}users/${safe}`
+}
+
 export function openVaultDb(email: string): void {
   if (db) return
-  const safeName = email.replace(/[^a-zA-Z0-9._-]/g, "_")
-  db = SQLite.openDatabaseSync(`vault_${safeName}.db`)
+  const dir = userDbDirectory(email)
+  db = SQLite.openDatabaseSync(dbFileName(email), {}, dir)
   initSchema()
 }
 

@@ -8,6 +8,8 @@ import { useSettings } from "@/lib/settings-context"
 import { listUserFiles, deleteUserDir, type VaultFileInfo } from "@/lib/storage"
 import { clearCredentials } from "@/lib/security-service"
 import { withOpacity, radius, type ColorPalette } from "@/lib/theme"
+import { exportArchive } from "@/lib/archive-service"
+import { uploadArchive, getTransferLimits } from "@/lib/transfer-service"
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -24,7 +26,7 @@ function fileIcon(name: string, isDirectory: boolean): keyof typeof MaterialComm
 }
 
 export default function SettingsScreen() {
-  const { currentUser, userDir, lock, changePassword } = useVault()
+  const { currentUser, currentEmail, userDir, lock, changePassword } = useVault()
   const { colors, colorScheme, toggleTheme } = useTheme()
   const { settings, update } = useSettings()
   const styles = useMemo(() => createStyles(colors), [colors])
@@ -43,6 +45,15 @@ export default function SettingsScreen() {
 
   // Auto-lock picker
   const [showAutoLockPicker, setShowAutoLockPicker] = useState(false)
+
+  // Transfer modal
+  const [showTransferModal, setShowTransferModal] = useState(false)
+  const [transferCode, setTransferCode] = useState("")
+  const [transferCopies, setTransferCopies] = useState(1)
+  const [transferLoading, setTransferLoading] = useState(false)
+  const [transferError, setTransferError] = useState("")
+  const [transferStep, setTransferStep] = useState<"config" | "result">("config")
+  const [transferPassword, setTransferPassword] = useState("")
 
   const refreshFiles = useCallback(async () => {
     if (!userDir) return
@@ -63,9 +74,23 @@ export default function SettingsScreen() {
       style={styles.container}
       contentContainerStyle={styles.content}
     >
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Settings</Text>
-        <Text style={styles.headerSub}>Security and vault configuration</Text>
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.headerTitle}>Settings</Text>
+          <Text style={styles.headerSub}>Security and vault configuration</Text>
+        </View>
+        <View style={styles.toolbarRow}>
+          <Pressable style={styles.toolbarBtn} onPress={toggleTheme}>
+            <Ionicons
+              name={colorScheme === "dark" ? "moon" : "sunny"}
+              size={14}
+              color={colors.foreground}
+            />
+          </Pressable>
+          <Pressable style={styles.toolbarBtn} onPress={() => {}}>
+            <Text style={styles.toolbarBtnText}>EN</Text>
+          </Pressable>
+        </View>
       </View>
 
       {/* Profile */}
@@ -74,29 +99,31 @@ export default function SettingsScreen() {
           <View style={styles.profileAvatar}>
             <Text style={styles.profileAvatarText}>{currentUser.avatar}</Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <View style={styles.profileNameRow}>
-              <Text style={styles.profileName}>{currentUser.name}</Text>
-              <View style={styles.ownerBadge}>
-                <Text style={styles.ownerBadgeText}>Owner</Text>
-              </View>
-            </View>
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName} numberOfLines={1}>{currentUser.name}</Text>
             <Text style={styles.profileSub}>Vault Family Owner</Text>
           </View>
           <View style={styles.profileActions}>
             <Pressable
-              style={styles.profileActionBtnDanger}
+              style={styles.profileSyncBtn}
+              onPress={() => {
+                setTransferCode("")
+                setTransferCopies(1)
+                setTransferError("")
+                setTransferStep("config")
+                setTransferPassword("")
+                setShowTransferModal(true)
+              }}
+            >
+              <Ionicons name="sync" size={14} color="#22c55e" />
+              <Text style={styles.profileSyncText}>Sync</Text>
+            </Pressable>
+            <Pressable
+              style={styles.profileDeleteBtn}
               onPress={() => setShowDeleteModal(true)}
             >
               <Ionicons name="trash" size={14} color={colors.destructive} />
-            </Pressable>
-            <Pressable
-              style={styles.profileActionBtn}
-              onPress={() => {
-                lock()
-              }}
-            >
-              <Text style={styles.signOutText}>Sign Out</Text>
+              <Text style={styles.profileDeleteText}>Delete</Text>
             </Pressable>
           </View>
         </View>
@@ -130,37 +157,6 @@ export default function SettingsScreen() {
           onToggle={(v) => {
             update("biometricEnabled", v)
           }}
-        />
-        <View style={styles.divider} />
-        <SettingRow
-          colors={colors}
-          styles={styles}
-          icon={
-            <Ionicons name="shield" size={16} color={colors.mutedForeground} />
-          }
-          label="Zeroize on Close"
-          description="Clear decrypted data from memory when app closes"
-          toggle
-          checked={settings.zeroizeOnClose}
-          onToggle={(v) => {
-            update("zeroizeOnClose", v)
-          }}
-        />
-        <View style={styles.divider} />
-        <SettingRow
-          colors={colors}
-          styles={styles}
-          icon={
-            <Ionicons
-              name={colorScheme === "dark" ? "moon" : "sunny"}
-              size={16}
-              color={colors.mutedForeground}
-            />
-          }
-          label="Dark Theme"
-          toggle
-          checked={colorScheme === "dark"}
-          onToggle={toggleTheme}
         />
         <View style={styles.divider} />
         <SettingRow
@@ -223,18 +219,6 @@ export default function SettingsScreen() {
             </View>
           ))
         )}
-      </View>
-
-      {/* System */}
-      <Text style={styles.sectionTitle}>System</Text>
-      <View style={styles.card}>
-        <SystemRow styles={styles} label="Backend" value="Rust / Axum" />
-        <View style={styles.divider} />
-        <SystemRow styles={styles} label="Encryption" value="AES-256-GCM" />
-        <View style={styles.divider} />
-        <SystemRow styles={styles} label="Key Exchange" value="X25519" />
-        <View style={styles.divider} />
-        <SystemRow styles={styles} label="KDF" value="PBKDF2 (600K)" />
       </View>
 
       {/* Delete Account Modal */}
@@ -354,6 +338,129 @@ export default function SettingsScreen() {
                 )}
               </Pressable>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Transfer to Device Modal */}
+      <Modal
+        visible={showTransferModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !transferLoading && setShowTransferModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={[styles.modalIconWrap, { backgroundColor: withOpacity(colors.primary, 0.12) }]}>
+              <Ionicons name="cloud-upload" size={28} color={colors.primary} />
+            </View>
+            <Text style={styles.modalTitle}>Transfer to Device</Text>
+
+            {transferStep === "config" ? (
+              <>
+                <Text style={styles.modalDesc}>
+                  Create an encrypted backup and get a one-time code to transfer it to another device.
+                </Text>
+                <TextInput
+                  style={styles.cpInput}
+                  value={transferPassword}
+                  onChangeText={setTransferPassword}
+                  placeholder="Master password"
+                  placeholderTextColor={colors.mutedForeground}
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+                <View style={styles.copiesRow}>
+                  <Text style={styles.copiesLabel}>Downloads allowed</Text>
+                  <View style={styles.copiesStepper}>
+                    <Pressable
+                      style={[styles.copiesBtn, transferCopies <= 1 && styles.copiesBtnDisabled]}
+                      disabled={transferCopies <= 1}
+                      onPress={() => setTransferCopies((c) => Math.max(1, c - 1))}
+                    >
+                      <Ionicons name="remove" size={16} color={transferCopies <= 1 ? colors.mutedForeground : colors.foreground} />
+                    </Pressable>
+                    <Text style={styles.copiesValue}>{transferCopies}</Text>
+                    <Pressable
+                      style={[styles.copiesBtn, transferCopies >= getTransferLimits().maxDevices && styles.copiesBtnDisabled]}
+                      disabled={transferCopies >= getTransferLimits().maxDevices}
+                      onPress={() => setTransferCopies((c) => Math.min(getTransferLimits().maxDevices, c + 1))}
+                    >
+                      <Ionicons name="add" size={16} color={transferCopies >= getTransferLimits().maxDevices ? colors.mutedForeground : colors.foreground} />
+                    </Pressable>
+                  </View>
+                </View>
+                <Text style={styles.copiesHint}>
+                  Free tier: max {getTransferLimits().maxDevices} device{getTransferLimits().maxDevices > 1 ? "s" : ""}
+                </Text>
+                {transferError !== "" && <Text style={styles.cpError}>{transferError}</Text>}
+                <View style={styles.modalActions}>
+                  <Pressable
+                    style={styles.modalCancelBtn}
+                    onPress={() => setShowTransferModal(false)}
+                  >
+                    <Text style={styles.modalCancelText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.modalSaveBtn, transferLoading && { opacity: 0.5 }]}
+                    disabled={transferLoading}
+                    onPress={async () => {
+                      if (!currentEmail) return
+                      if (!transferPassword) {
+                        setTransferError("Enter your master password")
+                        return
+                      }
+                      setTransferError("")
+                      setTransferLoading(true)
+                      try {
+                        const archiveResult = await exportArchive(currentEmail, transferPassword)
+                        if (!archiveResult.ok) {
+                          setTransferError(archiveResult.error)
+                          return
+                        }
+                        const uploadResult = await uploadArchive(archiveResult.archive, transferCopies)
+                        if (!uploadResult.ok) {
+                          setTransferError(uploadResult.error)
+                          return
+                        }
+                        setTransferCode(uploadResult.code)
+                        setTransferCopies(uploadResult.copies)
+                        setTransferStep("result")
+                      } catch (e) {
+                        setTransferError(e instanceof Error ? e.message : "Unknown error")
+                      } finally {
+                        setTransferLoading(false)
+                        setTransferPassword("")
+                      }
+                    }}
+                  >
+                    {transferLoading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.modalSaveText}>Generate Code</Text>
+                    )}
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={styles.transferCodeDisplay}>{transferCode}</Text>
+                <Text style={styles.modalDesc}>
+                  Enter this code on the other device to download your vault. Code expires in 10 minutes.
+                </Text>
+                <Text style={styles.copiesHint}>
+                  Downloads allowed: {transferCopies}
+                </Text>
+                <View style={styles.modalActions}>
+                  <Pressable
+                    style={[styles.modalSaveBtn, { flex: 1 }]}
+                    onPress={() => setShowTransferModal(false)}
+                  >
+                    <Text style={styles.modalSaveText}>Done</Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -480,24 +587,6 @@ function SettingRow({
   return <View style={styles.settingRow}>{content}</View>
 }
 
-function SystemRow({
-  styles,
-  label,
-  value,
-}: {
-  styles: ReturnType<typeof createStyles>
-  label: string
-  value: string
-}) {
-  return (
-    <View style={styles.systemRow}>
-      <Text style={styles.systemLabel}>{label}</Text>
-      <View style={styles.systemBadge}>
-        <Text style={styles.systemValue}>{value}</Text>
-      </View>
-    </View>
-  )
-}
 
 const createStyles = (colors: ColorPalette) => StyleSheet.create({
   container: {
@@ -509,7 +598,10 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     paddingBottom: 32,
     gap: 8,
   },
-  header: {
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 8,
   },
   headerTitle: {
@@ -521,6 +613,26 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     fontSize: 12,
     color: colors.mutedForeground,
     marginTop: 2,
+  },
+  toolbarRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  toolbarBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.md,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  toolbarBtnText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: colors.foreground,
   },
   sectionTitle: {
     fontSize: 12,
@@ -559,30 +671,19 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     fontWeight: "700",
     color: colors.primary,
   },
-  profileNameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+  profileInfo: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
   },
   profileName: {
     fontSize: 14,
     fontWeight: "600",
     color: colors.foreground,
   },
-  ownerBadge: {
-    backgroundColor: withOpacity(colors.primary, 0.15),
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  ownerBadgeText: {
-    fontSize: 10,
-    color: colors.primary,
-  },
   profileSub: {
     fontSize: 12,
     color: colors.mutedForeground,
-    marginTop: 2,
   },
   settingRow: {
     flexDirection: "row",
@@ -617,16 +718,6 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     color: colors.mutedForeground,
     fontFamily: "monospace",
   },
-  systemRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 12,
-  },
-  systemLabel: {
-    fontSize: 12,
-    color: colors.foreground,
-  },
   systemBadge: {
     backgroundColor: colors.secondary,
     paddingHorizontal: 8,
@@ -639,29 +730,37 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
     color: colors.secondaryForeground,
   },
   profileActions: {
-    flexDirection: "row",
-    gap: 8,
+    gap: 6,
   },
-  profileActionBtn: {
+  profileSyncBtn: {
     height: 32,
     paddingHorizontal: 12,
     borderRadius: radius.md,
-    backgroundColor: colors.secondary,
+    backgroundColor: withOpacity("#22c55e", 0.15),
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 6,
   },
-  signOutText: {
+  profileSyncText: {
     fontSize: 11,
-    fontWeight: "500",
-    color: colors.mutedForeground,
+    fontWeight: "600",
+    color: "#22c55e",
   },
-  profileActionBtnDanger: {
-    width: 32,
+  profileDeleteBtn: {
     height: 32,
+    paddingHorizontal: 12,
     borderRadius: radius.md,
     backgroundColor: withOpacity(colors.destructive, 0.1),
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 6,
+  },
+  profileDeleteText: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: colors.destructive,
   },
   storageTitleRow: {
     flexDirection: "row",
@@ -811,5 +910,56 @@ const createStyles = (colors: ColorPalette) => StyleSheet.create({
   alOptionTextActive: {
     color: colors.primary,
     fontWeight: "600",
+  },
+  copiesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    paddingHorizontal: 4,
+  },
+  copiesLabel: {
+    fontSize: 12,
+    color: colors.foreground,
+  },
+  copiesStepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 0,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: "hidden",
+  },
+  copiesBtn: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.secondary,
+  },
+  copiesBtnDisabled: {
+    opacity: 0.4,
+  },
+  copiesValue: {
+    width: 36,
+    textAlign: "center",
+    fontSize: 14,
+    fontWeight: "600",
+    fontFamily: "monospace",
+    color: colors.foreground,
+  },
+  copiesHint: {
+    fontSize: 10,
+    color: colors.mutedForeground,
+    textAlign: "center",
+  },
+  transferCodeDisplay: {
+    fontSize: 32,
+    fontWeight: "700",
+    fontFamily: "monospace",
+    color: colors.primary,
+    letterSpacing: 4,
+    paddingVertical: 8,
   },
 })

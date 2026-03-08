@@ -29,6 +29,7 @@ lib/                    # Business logic
 +-- settings-context.tsx
 +-- clipboard.ts        # Clipboard (expo-clipboard)
 +-- archive-service.ts  # Encrypted backup/restore
++-- transfer-service.ts # One-time code transfer (Axum server)
 +-- use-auto-lock.ts    # Auto-lock on background timeout
 +-- theme-context.tsx / theme.ts
 +-- types.ts            # Branded types, validation
@@ -173,6 +174,29 @@ Standard unlock (master.key already contains vault_key)
 
 Archives serialize to a string with magic prefix `VFARCHIVE1:` + JSON. Functions: `serializeArchive()` / `deserializeArchive()`.
 
+### One-time code transfer (Transfer Service)
+
+Device-to-device transfer via Axum server using disposable 6-digit codes:
+
+```
+Device A                        Axum server                     Device B
+    |                               |                               |
+    |-- POST /transfer ------------>|                               |
+    |   { payload, ttl: 10min }     |  stores blob in-memory        |
+    |<-- { code: "847-291" } -------|                               |
+    |                               |                               |
+    |   User communicates code      |                               |
+    |                               |                               |
+    |                               |<-- GET /transfer/847-291 -----|
+    |                               |--- { payload } (one-time) --->|
+    |                               |   (deletes after download)    |
+```
+
+- Server never sees plaintext — blob is already AES-256-GCM encrypted
+- Code expires after 10 minutes (TTL)
+- Single-use: deleted immediately after first download
+- `setTransferServer(url)` configures the Axum endpoint
+
 ## Authentication Flow
 
 1. **Vault creation** — PBKDF2 hashes password (PHC format), generates random Vault Key, encrypts it with Master Key, saves to `master.key` (v2)
@@ -215,9 +239,11 @@ yarn build:android   # Android APK
 - Multi-user support
 - Auto-migration v1 -> v2 with entry re-encryption
 - Encrypted backup/restore (archive-service)
+- One-time code transfer client (transfer-service)
 
 ## TODO
 
+- Axum server: `/transfer` endpoints (in-memory store + TTL)
 - Backend sync (Axum API)
 - X25519 key exchange for shared vaults
 - Clipboard auto-clear after password copy
