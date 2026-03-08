@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.7.0](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.6.0...v1.7.0) (2026-03-08)
+
+
+### Features
+
+* add one-time code transfer service for device-to-device backup ([af7308b](https://github.com/AvdienkoSergey/vault-family-ui/commit/af7308b78177ce977a6907533c38618505603027))
+* **transfer:** add copies limit with configurable maxDevices ([7c6feab](https://github.com/AvdienkoSergey/vault-family-ui/commit/7c6feab341f928c8987270aa407296aff3c10581))
+* **ui:** add Transfer to Device button and modal in Settings ([370ce34](https://github.com/AvdienkoSergey/vault-family-ui/commit/370ce34e582d756f02c0449c520bf6398bfdd9d0))
+
+
+### Bug Fixes
+
+* **settings:** restore profile subtitle, soften Sync button color ([e85484e](https://github.com/AvdienkoSergey/vault-family-ui/commit/e85484eb6b4de1c9392d1a5b32ea3c6fe9645723))
+* **transfer:** default copies to 1 instead of maxDevices ([f26157a](https://github.com/AvdienkoSergey/vault-family-ui/commit/f26157adb0d94aae33f2c86cd5bb4fa841445e90))
+
 ## [1.6.0](https://github.com/AvdienkoSergey/vault-family-ui/compare/v1.5.3...v1.6.0) (2026-03-07)
 
 
